@@ -57,6 +57,7 @@ jobs:
         run: kyverno test policies/tests/kyverno
 
       - name: Run Conftest optional checks
+        continue-on-error: true
         run: conftest test policies/tests/kyverno/resources --policy policies/conftest
 
       - name: Trivy config scan

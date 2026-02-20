@@ -25,7 +25,7 @@ jobs:
       - name: Install Kyverno CLI
         run: |
           VERSION=v1.13.4
-          ARCH=amd64
+          ARCH=x86_64
           curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${VERSION}/kyverno-cli_${VERSION#v}_linux_${ARCH}.tar.gz" -o kyverno.tgz
           tar -xzf kyverno.tgz kyverno
           chmod +x kyverno

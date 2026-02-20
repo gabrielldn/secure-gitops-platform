@@ -26,7 +26,7 @@ jobs:
         run: |
           VERSION=v1.13.4
           ARCH=x86_64
-          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${VERSION}/kyverno-cli_${VERSION#v}_linux_${ARCH}.tar.gz" -o kyverno.tgz
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${VERSION}/kyverno-cli_${VERSION}_linux_${ARCH}.tar.gz" -o kyverno.tgz
           tar -xzf kyverno.tgz kyverno
           chmod +x kyverno
           sudo mv kyverno /usr/local/bin/kyverno

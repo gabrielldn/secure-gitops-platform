@@ -1,0 +1,80 @@
+configs:
+  params:
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    server.insecure: "true"
+    controller.status.processors: "10"
+    controller.operation.processors: "5"
+    reposerver.parallelism.limit: "2"
+    controller.repo.server.timeout.seconds: "180"
+  cm:
+    resource.customizations.health.argoproj.io_Rollout: |
+      hs = {}
+      if obj.status ~= nil then
+        if obj.status.phase == "Healthy" then
+          hs.status = "Healthy"
+          hs.message = "Rollout is healthy"
+        else
+          hs.status = "Progressing"
+          hs.message = "Rollout is progressing"
+        end
+      end
+      return hs
+  rbac:
+    policy.default: role:readonly
+
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 400m
+      memory: 512Mi
+
+controller:
+  metrics:
+    enabled: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 700m
+      memory: 1Gi
+
+repoServer:
+  metrics:
+    enabled: true
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 700m
+      memory: 1Gi
+
+applicationSet:
+  enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+notifications:
+  enabled: false

@@ -1,0 +1,35 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged-hostpath
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: disallow-privileged
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: Privileged containers are not allowed.
+        pattern:
+          spec:
+            =(containers):
+              - securityContext:
+                  =(privileged): "false"
+    - name: disallow-hostpath
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: hostPath volumes are not allowed.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.volumes[].hostPath || [] | length(@) }}"
+                operator: GreaterThan
+                value: 0

@@ -1,0 +1,634 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: traefik
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 34.2.0
+    helm:
+      releaseName: traefik
+      values: |
+        logs:
+          general:
+            level: INFO
+        deployment:
+          replicas: 1
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - RespectIgnoreDifferences=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: cert-manager
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.16.2
+    helm:
+      releaseName: cert-manager
+      values: |
+        installCRDs: true
+        startupapicheck:
+          enabled: false
+        prometheus:
+          enabled: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-vault
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: vault
+  source:
+    repoURL: https://helm.releases.hashicorp.com
+    chart: vault
+    targetRevision: 0.28.1
+    helm:
+      releaseName: vault
+      values: |
+        server:
+          ha:
+            enabled: true
+            replicas: 1
+            raft:
+              enabled: true
+          service:
+            type: NodePort
+            nodePort: 30200
+          dataStorage:
+            enabled: true
+            size: 5Gi
+          auditStorage:
+            enabled: false
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+        injector:
+          enabled: false
+        csi:
+          enabled: false
+        ui:
+          enabled: true
+  ignoreDifferences:
+    - group: policy
+      kind: PodDisruptionBudget
+      name: vault
+      namespace: vault
+      jqPathExpressions:
+        - .spec
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-step-ca
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: step-ca
+  source:
+    repoURL: https://smallstep.github.io/helm-charts
+    chart: step-certificates
+    targetRevision: 1.29.0
+    helm:
+      releaseName: step-ca
+      values: |
+        service:
+          type: NodePort
+          nodePort: 30443
+        ca:
+          dns: host.k3d.internal,step-ca.step-ca.svc.cluster.local,127.0.0.1
+          url: https://host.k3d.internal:19443
+        injector:
+          enabled: false
+        podSecurityContext:
+          fsGroup: 1000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: external-secrets
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 0.11.0
+    helm:
+      releaseName: external-secrets
+      values: |
+        installCRDs: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: kyverno
+  source:
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: 3.3.7
+    helm:
+      releaseName: kyverno
+      values: |
+        webhooksCleanup:
+          enabled: false
+        policyReportsCleanup:
+          enabled: false
+        admissionController:
+          replicas: 1
+        backgroundController:
+          replicas: 1
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-argo-rollouts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: argo-rollouts
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.38.0
+    helm:
+      releaseName: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-trivy-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: trivy-system
+  source:
+    repoURL: https://aquasecurity.github.io/helm-charts
+    chart: trivy-operator
+    targetRevision: 0.24.1
+    helm:
+      releaseName: trivy-operator
+      values: |
+        operator:
+          clusterComplianceEnabled: false
+        serviceMonitor:
+          enabled: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-falco
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: falco
+  source:
+    repoURL: https://falcosecurity.github.io/charts
+    chart: falco
+    targetRevision: 4.19.0
+    helm:
+      releaseName: falco
+      values: |
+        driver:
+          kind: modern_ebpf
+        falco:
+          grpc:
+            enabled: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-step-issuer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: step-issuer
+  source:
+    repoURL: https://smallstep.github.io/helm-charts
+    chart: step-issuer
+    targetRevision: 1.8.0
+    helm:
+      releaseName: step-issuer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: observability
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 66.2.1
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        grafana:
+          enabled: true
+          defaultDashboardsTimezone: utc
+        alertmanager:
+          enabled: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: observability
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: loki
+    targetRevision: 6.24.0
+    helm:
+      releaseName: loki
+      values: |
+        deploymentMode: SingleBinary
+        singleBinary:
+          replicas: 1
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+        backend:
+          replicas: 0
+        loki:
+          auth_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+            bucketNames:
+              chunks: chunks
+              ruler: ruler
+              admin: admin
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-tempo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: observability
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    chart: tempo
+    targetRevision: 1.10.1
+    helm:
+      releaseName: tempo
+      values: |
+        tempo:
+          reportingEnabled: false
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: observability
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: 0.112.0
+    helm:
+      releaseName: otel-collector
+      values: |
+        image:
+          repository: otel/opentelemetry-collector-k8s
+        mode: deployment
+        config:
+          receivers:
+            otlp:
+              protocols:
+                grpc: {}
+                http: {}
+          processors:
+            batch: {}
+          exporters:
+            logging:
+              verbosity: detailed
+          service:
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [batch]
+                exporters: [logging]
+              metrics:
+                receivers: [otlp]
+                processors: [batch]
+                exporters: [logging]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-slo-alerts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: observability
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: slo
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-cosign-public-key
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: kyverno
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/security/cosign-public-key
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: kyverno
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: policies/kyverno/env/dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-external-secret-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "45"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+    namespace: external-secrets
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/secrets/dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-step-cluster-issuer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-dev-platform
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/pki/cluster-issuers/dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-podinfo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: workloads-dev
+  destination:
+    name: sgp-dev-platform
+    namespace: apps
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/workloads/podinfo/overlays/dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

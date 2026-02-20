@@ -1,0 +1,81 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-core
+  namespace: argocd
+spec:
+  description: Cluster-level and platform operators
+  sourceRepos:
+    - '*'
+  destinations:
+    - name: in-cluster
+      namespace: argocd
+    - name: sgp-dev-platform
+      namespace: '*'
+    - name: sgp-homolog-platform
+      namespace: '*'
+    - name: sgp-prod-platform
+      namespace: '*'
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workloads-dev
+  namespace: argocd
+spec:
+  description: Workloads for dev
+  sourceRepos:
+    - '*'
+  destinations:
+    - name: sgp-dev-platform
+      namespace: apps
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workloads-homolog
+  namespace: argocd
+spec:
+  description: Workloads for homolog
+  sourceRepos:
+    - '*'
+  destinations:
+    - name: sgp-homolog-platform
+      namespace: apps
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: workloads-prod
+  namespace: argocd
+spec:
+  description: Workloads for prod
+  sourceRepos:
+    - '*'
+  destinations:
+    - name: sgp-prod-platform
+      namespace: apps
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

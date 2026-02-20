@@ -1,0 +1,97 @@
+name: release-supply-chain
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build-sign-attest:
+    runs-on: [self-hosted, Linux]
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/secure-gitops-demo-app
+      ENABLE_LOCAL_SYNC: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push image
+        id: image
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${GITHUB_SHA::12}"
+          IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
+          docker build -t "${IMAGE_REF}" supply-chain/demo-app
+          docker push "${IMAGE_REF}"
+          DIGEST="$(crane digest "${IMAGE_REF}")"
+          echo "image_ref=${IMAGE_NAME}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate SBOM (Syft)
+        run: syft "${{ steps.image.outputs.image_ref }}" -o spdx-json=sbom.spdx.json
+
+      - name: Scan image (Grype)
+        run: grype "${{ steps.image.outputs.image_ref }}" --fail-on high
+
+      - name: Scan image (Trivy)
+        run: trivy image --exit-code 1 --severity HIGH,CRITICAL "${{ steps.image.outputs.image_ref }}"
+
+      - name: Prepare signing key
+        run: |
+          set -euo pipefail
+          if [[ -n "${VAULT_ADDR:-}" && -n "${VAULT_TOKEN:-}" ]]; then
+            vault login "$VAULT_TOKEN" >/dev/null
+            vault kv get -field=private_key kv/cicd/cosign > cosign.key
+          elif [[ -n "${COSIGN_PRIVATE_KEY:-}" ]]; then
+            printf '%s\n' "$COSIGN_PRIVATE_KEY" > cosign.key
+          else
+            echo "No cosign key source found (Vault or COSIGN_PRIVATE_KEY)."
+            exit 1
+          fi
+          chmod 600 cosign.key
+        env:
+          VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+          VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+
+      - name: Sign image (Cosign)
+        run: cosign sign --yes --tlog-upload=false --key cosign.key "${{ steps.image.outputs.image_ref }}"
+
+      - name: Generate provenance predicate
+        run: |
+          set -euo pipefail
+          cp supply-chain/attestations/slsa-provenance-template.json provenance.json
+          sed -i "s#IMAGE_REF#${{ steps.image.outputs.image_ref }}#g" provenance.json
+          sed -i "s#IMAGE_DIGEST#${{ steps.image.outputs.image_digest }}#g" provenance.json
+          sed -i "s#GIT_SHA#${GITHUB_SHA}#g" provenance.json
+          sed -i "s#OWNER/REPO#${GITHUB_REPOSITORY}#g" provenance.json
+
+      - name: Attach SBOM attestation
+        run: cosign attest --yes --tlog-upload=false --key cosign.key --predicate sbom.spdx.json --type spdx "${{ steps.image.outputs.image_ref }}"
+
+      - name: Attach SLSA attestation
+        run: cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+
+      - name: Optional local registry sync
+        run: |
+          if [[ "${ENABLE_LOCAL_SYNC}" == "true" ]]; then
+            ./scripts/sync-image-to-local-registry.sh "${{ steps.image.outputs.image_ref }}" localhost:5001
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-artifacts
+          path: |
+            sbom.spdx.json
+            provenance.json

@@ -1,0 +1,379 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-traefik
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: traefik
+  source:
+    repoURL: https://traefik.github.io/charts
+    chart: traefik
+    targetRevision: 34.2.0
+    helm:
+      releaseName: traefik
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: cert-manager
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.16.2
+    helm:
+      releaseName: cert-manager
+      values: |
+        installCRDs: true
+        startupapicheck:
+          enabled: false
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: external-secrets
+  source:
+    repoURL: https://charts.external-secrets.io
+    chart: external-secrets
+    targetRevision: 0.11.0
+    helm:
+      releaseName: external-secrets
+      values: |
+        installCRDs: true
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-kyverno
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: kyverno
+  source:
+    repoURL: https://kyverno.github.io/kyverno
+    chart: kyverno
+    targetRevision: 3.3.7
+    helm:
+      releaseName: kyverno
+      values: |
+        webhooksCleanup:
+          enabled: false
+        policyReportsCleanup:
+          enabled: false
+        admissionController:
+          replicas: 1
+        backgroundController:
+          replicas: 1
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-argo-rollouts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: argo-rollouts
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.38.0
+    helm:
+      releaseName: argo-rollouts
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-trivy-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: trivy-system
+  source:
+    repoURL: https://aquasecurity.github.io/helm-charts
+    chart: trivy-operator
+    targetRevision: 0.24.1
+    helm:
+      releaseName: trivy-operator
+      values: |
+        operator:
+          clusterComplianceEnabled: false
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-falco
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: falco
+  source:
+    repoURL: https://falcosecurity.github.io/charts
+    chart: falco
+    targetRevision: 4.19.0
+    helm:
+      releaseName: falco
+      values: |
+        driver:
+          kind: modern_ebpf
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-step-issuer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: step-issuer
+  source:
+    repoURL: https://smallstep.github.io/helm-charts
+    chart: step-issuer
+    targetRevision: 1.8.0
+    helm:
+      releaseName: step-issuer
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-otel-collector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: observability
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-collector
+    targetRevision: 0.112.0
+    helm:
+      releaseName: otel-collector
+      values: |
+        image:
+          repository: otel/opentelemetry-collector-k8s
+        mode: daemonset
+        config:
+          receivers:
+            otlp:
+              protocols:
+                grpc: {}
+                http: {}
+          processors:
+            batch: {}
+          exporters:
+            otlp:
+              endpoint: tempo.observability.svc.cluster.local:4317
+              tls:
+                insecure: true
+          service:
+            pipelines:
+              traces:
+                receivers: [otlp]
+                processors: [batch]
+                exporters: [otlp]
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-cosign-public-key
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: kyverno
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/security/cosign-public-key
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-kyverno-policies
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: kyverno
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: policies/kyverno/env/homolog
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-external-secret-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "45"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: external-secrets
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/secrets/homolog
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-step-cluster-issuer
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/pki/cluster-issuers/homolog
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-podinfo
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+spec:
+  project: workloads-homolog
+  destination:
+    name: sgp-homolog-platform
+    namespace: apps
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/workloads/podinfo/overlays/homolog
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

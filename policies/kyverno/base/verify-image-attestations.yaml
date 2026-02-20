@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-attestations
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-slsa-and-sbom-attestations
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - apps
+      verifyImages:
+        - imageReferences:
+            - "ghcr.io/gabrielldn/*"
+          mutateDigest: false
+          required: true
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - count: 1
+                  entries:
+                    - keys:
+                        publicKeys: |-
+                          -----BEGIN PUBLIC KEY-----
+                          REPLACE_WITH_COSIGN_PUBLIC_KEY
+                          -----END PUBLIC KEY-----
+            - type: https://spdx.dev/Document
+              attestors:
+                - count: 1
+                  entries:
+                    - keys:
+                        publicKeys: |-
+                          -----BEGIN PUBLIC KEY-----
+                          REPLACE_WITH_COSIGN_PUBLIC_KEY
+                          -----END PUBLIC KEY-----

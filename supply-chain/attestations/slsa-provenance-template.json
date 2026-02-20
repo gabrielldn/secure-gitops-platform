@@ -1,0 +1,29 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "IMAGE_REF",
+      "digest": {
+        "sha256": "IMAGE_DIGEST"
+      }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "buildType": "https://github.com/secure-gitops-platform/release-workflow@v1",
+    "builder": {
+      "id": "https://github.com/OWNER/REPO/.github/workflows/release.yml"
+    },
+    "buildDefinition": {
+      "buildArguments": {
+        "git_sha": "GIT_SHA"
+      },
+      "externalParameters": {}
+    },
+    "runDetails": {
+      "builder": {
+        "id": "github-actions-self-hosted"
+      }
+    }
+  }
+}

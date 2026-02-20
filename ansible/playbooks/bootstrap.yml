@@ -1,0 +1,52 @@
+---
+- name: Bootstrap secure-gitops-platform host
+  hosts: local
+  gather_facts: true
+  vars_files:
+    - ../group_vars/all.yml
+
+  tasks:
+    - name: Ensure base directories exist
+      become: false
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ lookup('env', 'HOME') }}/.local/bin"
+        - "{{ lookup('env', 'HOME') }}/.config/sops/age"
+
+    - name: Install pinned CLI toolchain via bootstrap script
+      ansible.builtin.command:
+        cmd: "{{ playbook_dir }}/../../scripts/bootstrap-tools.sh"
+      environment:
+        K3D_VERSION: "{{ cli_versions.k3d }}"
+        KUBECTL_VERSION: "{{ cli_versions.kubectl }}"
+        HELM_VERSION: "{{ cli_versions.helm }}"
+        KUSTOMIZE_VERSION: "{{ cli_versions.kustomize }}"
+        YQ_VERSION: "{{ cli_versions.yq }}"
+        TRIVY_VERSION: "{{ cli_versions.trivy }}"
+        SYFT_VERSION: "{{ cli_versions.syft }}"
+        GRYPE_VERSION: "{{ cli_versions.grype }}"
+        COSIGN_VERSION: "{{ cli_versions.cosign }}"
+        CONFTEST_VERSION: "{{ cli_versions.conftest }}"
+        KYVERNO_VERSION: "{{ cli_versions.kyverno }}"
+        SOPS_VERSION: "{{ cli_versions.sops }}"
+        STEP_VERSION: "{{ cli_versions.step }}"
+        VAULT_VERSION: "{{ cli_versions.vault }}"
+        CRANE_VERSION: "{{ cli_versions.crane }}"
+
+    - name: Detect main user for docker group adjustment
+      ansible.builtin.set_fact:
+        bootstrap_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
+
+    - name: Add main user to docker group
+      ansible.builtin.user:
+        name: "{{ bootstrap_user }}"
+        groups: docker
+        append: true
+      ignore_errors: true
+
+    - name: Print post-bootstrap reminder
+      ansible.builtin.debug:
+        msg: "Bootstrap completed. Restart the shell session so docker group changes take effect."

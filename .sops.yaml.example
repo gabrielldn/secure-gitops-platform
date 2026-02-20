@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: \.secrets/.*\.(yaml|yml|json)$
+    encrypted_regex: '^(data|stringData|token|root_token|unseal_keys_b64)$'
+    age: age1replacewithpublickey

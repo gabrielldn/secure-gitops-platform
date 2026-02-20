@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: podinfo
+  annotations:
+    cert-manager.io/cluster-issuer: step-ca-issuer
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - podinfo.dev.127.0.0.1.nip.io
+      secretName: podinfo-tls
+  rules:
+    - host: podinfo.dev.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: podinfo-stable
+                port:
+                  number: 9898

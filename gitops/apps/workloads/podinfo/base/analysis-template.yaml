@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: podinfo-success-rate
+spec:
+  metrics:
+    - name: success-rate
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: result[0] >= 0.995
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            (
+              sum(rate(http_requests_total{namespace="apps",app="podinfo",code!~"5.."}[1m]))
+              /
+              sum(rate(http_requests_total{namespace="apps",app="podinfo"}[1m]))
+            ) or vector(1)
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: podinfo-latency-p95
+spec:
+  metrics:
+    - name: latency-p95
+      interval: 30s
+      count: 4
+      failureLimit: 1
+      successCondition: result[0] <= 0.40
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090
+          query: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{namespace="apps",app="podinfo"}[2m])
+              )
+            ) or vector(0)

@@ -1,0 +1,48 @@
+meta:
+  generated_at: "2026-02-20"
+  baseline: "wsl-ubuntu-24.04"
+
+cli:
+  k3d: "v5.8.3"
+  kubectl: "v1.31.5"
+  helm: "v3.16.4"
+  kustomize: "v5.5.0"
+  jq: "1.7.1"
+  yq: "v4.45.1"
+  trivy: "v0.56.2"
+  syft: "v1.18.1"
+  grype: "v0.84.0"
+  cosign: "v2.4.1"
+  conftest: "v0.57.0"
+  kyverno_cli: "v1.13.4"
+  sops: "v3.9.1"
+  age: "v1.2.1"
+  step_cli: "v0.29.0"
+  vault: "1.18.3"
+  crane: "v0.20.3"
+
+kubernetes:
+  k3s_image: "rancher/k3s:v1.31.5-k3s1"
+
+charts:
+  argocd: "7.8.5"
+  argo_rollouts: "2.38.0"
+  cert_manager: "v1.16.2"
+  external_secrets: "0.11.0"
+  kyverno: "3.3.7"
+  trivy_operator: "0.24.1"
+  falco: "4.19.0"
+  vault: "0.28.1"
+  step_certificates: "1.29.0"
+  step_issuer: "1.8.0"
+  kube_prometheus_stack: "66.2.1"
+  loki: "6.24.0"
+  tempo: "1.10.1"
+  opentelemetry_collector: "0.112.0"
+  traefik: "34.2.0"
+
+images:
+  podinfo: "ghcr.io/stefanprodan/podinfo:6.7.1"
+
+supply_chain:
+  slsa_generator: "v2.1.0"

@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-roots
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+          - env: homolog
+          - env: prod
+  template:
+    metadata:
+      name: '{{env}}-root'
+    spec:
+      project: platform-core
+      source:
+        repoURL: __REPO_URL__
+        targetRevision: __GITOPS_REVISION__
+        path: gitops/clusters/{{env}}
+      destination:
+        name: in-cluster
+        namespace: argocd
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

@@ -1,0 +1,12 @@
+service: podinfo
+slo:
+  availability:
+    target: 99.5
+    sli: |
+      sum(rate(http_requests_total{namespace="apps",app="podinfo",code=~"2..|3.."}[5m]))
+      /
+      sum(rate(http_requests_total{namespace="apps",app="podinfo"}[5m]))
+  latency_p95:
+    target_seconds: 0.40
+    sli: |
+      histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{namespace="apps",app="podinfo"}[5m])))

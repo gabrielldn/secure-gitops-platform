@@ -1,0 +1,17 @@
+---
+cli_versions:
+  k3d: v5.8.3
+  kubectl: v1.31.5
+  helm: v3.16.4
+  kustomize: v5.5.0
+  yq: v4.45.1
+  trivy: v0.56.2
+  syft: v1.18.1
+  grype: v0.84.0
+  cosign: v2.4.1
+  conftest: v0.57.0
+  kyverno: v1.13.4
+  sops: v3.9.1
+  step: v0.29.0
+  vault: 1.18.3
+  crane: v0.20.3

@@ -1,0 +1,41 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: sgp-dev
+servers: 1
+agents: 2
+image: rancher/k3s:v1.31.5-k3s1
+kubeAPI:
+  hostIP: "0.0.0.0"
+  hostPort: "6550"
+ports:
+  - port: 8081:80
+    nodeFilters:
+      - loadbalancer
+  - port: 8444:443
+    nodeFilters:
+      - loadbalancer
+  - port: 18200:30200
+    nodeFilters:
+      - loadbalancer
+  - port: 19443:30443
+    nodeFilters:
+      - loadbalancer
+options:
+  k3d:
+    wait: true
+    timeout: "300s"
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+      - arg: --tls-san=host.k3d.internal
+        nodeFilters:
+          - server:*
+registries:
+  use:
+    - k3d-sgp-registry.localhost:5001

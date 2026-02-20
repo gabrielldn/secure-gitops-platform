@@ -1,0 +1,22 @@
+# Runtime artifacts
+.kube/
+.secrets/
+.tmp/
+
+# Local env and state
+.env
+*.log
+*.tmp
+*.swp
+
+# Python / Ansible
+__pycache__/
+*.retry
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

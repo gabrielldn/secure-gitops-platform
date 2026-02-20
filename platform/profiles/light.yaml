@@ -1,0 +1,25 @@
+profile: light
+host:
+  min_cpu: 6
+  min_memory_gb: 8
+  min_disk_gb: 30
+registry:
+  name: sgp-registry.localhost
+  host: localhost
+  port: 5001
+clusters:
+  dev:
+    servers: 1
+    agents: 1
+    ingress_http_port: 8081
+    ingress_https_port: 8444
+  homolog:
+    servers: 1
+    agents: 1
+    ingress_http_port: 8082
+    ingress_https_port: 8445
+  prod:
+    servers: 1
+    agents: 1
+    ingress_http_port: 8083
+    ingress_https_port: 8446

@@ -1,0 +1,24 @@
+name: local-registry-sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: "Image reference with digest (e.g. ghcr.io/org/image@sha256:...)"
+        required: true
+        type: string
+      target_registry:
+        description: "Target registry"
+        required: false
+        default: "localhost:5001"
+        type: string
+
+jobs:
+  sync:
+    runs-on: [self-hosted, Linux]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync image into local registry
+        run: ./scripts/sync-image-to-local-registry.sh "${{ inputs.image_ref }}" "${{ inputs.target_registry }}"

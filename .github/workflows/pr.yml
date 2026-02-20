@@ -1,0 +1,63 @@
+name: pr-security-and-policy
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        run: |
+          YQ_VERSION=v4.45.1
+          ARCH=amd64
+          curl -fsSL "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}" -o yq
+          chmod +x yq
+          sudo mv yq /usr/local/bin/yq
+
+      - name: Install Kyverno CLI
+        run: |
+          VERSION=v1.13.4
+          ARCH=amd64
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${VERSION}/kyverno-cli_${VERSION#v}_linux_${ARCH}.tar.gz" -o kyverno.tgz
+          tar -xzf kyverno.tgz kyverno
+          chmod +x kyverno
+          sudo mv kyverno /usr/local/bin/kyverno
+
+      - name: Install Conftest
+        run: |
+          VERSION=v0.57.0
+          ARCH=amd64
+          curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/${VERSION}/conftest_${VERSION#v}_Linux_${ARCH}.tar.gz" -o conftest.tgz
+          tar -xzf conftest.tgz conftest
+          chmod +x conftest
+          sudo mv conftest /usr/local/bin/conftest
+
+      - name: Install Trivy
+        run: |
+          VERSION=v0.56.2
+          ARCH=64bit
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/${VERSION}/trivy_${VERSION#v}_Linux-${ARCH}.tar.gz" -o trivy.tgz
+          tar -xzf trivy.tgz trivy
+          chmod +x trivy
+          sudo mv trivy /usr/local/bin/trivy
+
+      - name: Validate YAML syntax
+        run: |
+          find gitops policies -type f \( -name '*.yaml' -o -name '*.yml' \) -print0 | xargs -0 -n1 yq e 'true' >/dev/null
+
+      - name: Run Kyverno tests
+        run: kyverno test policies/tests/kyverno
+
+      - name: Run Conftest optional checks
+        run: conftest test policies/tests/kyverno/resources --policy policies/conftest
+
+      - name: Trivy config scan
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL .

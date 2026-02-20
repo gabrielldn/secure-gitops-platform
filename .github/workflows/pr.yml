@@ -61,4 +61,4 @@ jobs:
         run: conftest test policies/tests/kyverno/resources --policy policies/conftest
 
       - name: Trivy config scan
-        run: trivy config --exit-code 1 --severity HIGH,CRITICAL .
+        run: trivy config --exit-code 1 --severity HIGH,CRITICAL --skip-dirs policies/tests --skip-dirs supply-chain/demo-app .

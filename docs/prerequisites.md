@@ -1,16 +1,28 @@
-# Prerequisites
+# Pré-requisitos
 
-## Host baseline
+## Ambiente alvo
 
-- WSL2 Ubuntu 24.04.
-- Docker Engine installed and running.
-- Ansible available.
-- `make` available (or run Ansible bootstrap command directly).
-- Internet access for chart/image downloads.
+- WSL2 com Ubuntu 24.04.
+- Docker Engine funcional no WSL.
+- Ansible disponível.
+- Acesso à internet para baixar charts/imagens.
 
-## Recommended WSL profile (`full`)
+## Perfis suportados
 
-Create `%UserProfile%\\.wslconfig` on Windows:
+Perfis definidos em `platform/profiles/`:
+
+- `light` (padrão para convergência local):
+  - CPU mínima: 6
+  - Memória mínima: 8 GB
+  - Disco mínimo: 30 GB
+- `full` (cenário mais próximo de produção local):
+  - CPU mínima: 8
+  - Memória mínima: 16 GB
+  - Disco mínimo: 50 GB
+
+## Configuração recomendada do WSL (`full`)
+
+Crie `%UserProfile%\\.wslconfig` no Windows:
 
 ```ini
 [wsl2]
@@ -20,32 +32,69 @@ swap=8GB
 localhostForwarding=true
 ```
 
-Then run `wsl --shutdown` from Windows PowerShell and reopen Ubuntu.
+Depois execute no PowerShell do Windows:
 
-Templates are available in:
+```powershell
+wsl --shutdown
+```
+
+Modelos prontos:
 
 - `scripts/wslconfig-full.template`
 - `scripts/wslconfig-light.template`
 
-## Fallback profile (`light`)
+## Ferramentas exigidas
 
-If host memory is constrained, use:
+Validadas por `make doctor`:
+
+- `docker`, `ansible`, `k3d`, `kubectl`, `helm`, `jq`, `yq`
+- `trivy`, `syft`, `grype`, `cosign`, `conftest`, `kyverno`
+- `sops`, `age`, `step`, `vault`, `rsync`
+
+Para instalar automaticamente (incluindo `make`):
+
+```bash
+make bootstrap
+```
+
+## Verificação inicial
 
 ```bash
 make doctor PROFILE=light
-make up PROFILE=light
+make versions
 ```
 
-`light` is the default profile for local convergence and acceptance tests.
+## Portas locais utilizadas
 
-## Docker group access
+- Registry local: `localhost:5001`
+- API Kubernetes:
+  - `sgp-dev`: `6550`
+  - `sgp-homolog`: `6551`
+  - `sgp-prod`: `6552`
+- Ingress:
+  - `dev`: `8081/8444`
+  - `homolog`: `8082/8445`
+  - `prod`: `8083/8446`
+- Serviços de hub expostos para spokes:
+  - Vault: `18200`
+  - Step-CA: `19443`
 
-`make bootstrap` adds your Linux user to the `docker` group. Restart your shell/session after bootstrap.
+## Acesso ao Docker sem sudo
 
-## Falco in WSL
+`make bootstrap` adiciona o usuário ao grupo `docker`.
 
-Falco is best-effort on WSL due to kernel/eBPF constraints.
+Após bootstrap, reinicie o shell/sessão:
 
-- If Falco works: keep it enabled.
-- If Falco fails: keep Trivy Operator + policies + audit/alerts as mandatory fallback.
-- `make verify` marks Falco as conditional in WSL.
+```bash
+newgrp docker
+```
+
+## Observação sobre Falco no WSL
+
+Falco depende de suporte de kernel/eBPF e em WSL pode não funcionar.
+
+Contrato do projeto:
+
+- Falco: `best-effort`.
+- Fallback obrigatório: Kyverno + Trivy Operator + auditoria/alertas.
+- `make verify` trata Falco como condicional em WSL.

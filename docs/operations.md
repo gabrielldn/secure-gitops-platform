@@ -1,66 +1,118 @@
-# Operations
+# Operações
 
-## Bootstrap
+## Fluxo E2E recomendado
+
+### 1) Preparação
 
 ```bash
 make doctor PROFILE=light
+make versions
+```
+
+Se faltar toolchain:
+
+```bash
 make bootstrap
 ```
 
-## Bring platform up
+### 2) Provisionamento local
 
 ```bash
 make up PROFILE=light
-make reconcile
+```
+
+Cria:
+
+- Registry local (`localhost:5001`)
+- Clusters `sgp-dev`, `sgp-homolog`, `sgp-prod`
+- Kubeconfig local em `.kube/config`
+
+### 3) Bootstrap GitOps
+
+```bash
+make reconcile PROFILE=light
+```
+
+Observações:
+
+- `make reconcile` executa bootstrap do Argo CD, registro de clusters e espera de convergência dos apps críticos.
+- Por padrão, sem `REPO_URL`, o projeto gera repo renderizado local e publica via `git daemon` em `git://host.k3d.internal:9418/...`.
+
+Para usar repositório remoto:
+
+```bash
+make reconcile PROFILE=light \
+  REPO_URL=https://github.com/<org>/secure-gitops-platform.git \
+  GITOPS_REVISION=main \
+  ARGO_WAIT_TIMEOUT=1800
+```
+
+### 4) Segredos e PKI
+
+```bash
 make vault-bootstrap
 make vault-configure
 make stepca-bootstrap
-```
-
-## Post-bootstrap materialization
-
-1. Render Step issuer values from encrypted bootstrap material:
-
-```bash
 ./scripts/render-step-issuer-values.sh
+make reconcile PROFILE=light
 ```
 
-2. Render Cosign public key:
+Notas importantes:
+
+- `vault-bootstrap` é de primeira execução; se `.secrets/vault/init.enc.json` já existir, o comando aborta por segurança.
+- `stepca-bootstrap` salva material cifrado em `.secrets/step-ca/bootstrap.enc.json`.
+- `render-step-issuer-values.sh` materializa `kid`, `caBundle` e `password` nos manifests de issuer.
+
+### 5) Verificação
 
 ```bash
-./scripts/render-cosign-public-key.sh /path/to/cosign.pub
+make verify-quick PROFILE=light
+make verify PROFILE=light
 ```
 
-3. Trust Step root CA:
+`make verify` cobre:
+
+- Reachability dos 3 clusters
+- Namespaces críticos
+- `StepClusterIssuer` pronto nos 3 ambientes
+- Argo CD no hub
+- Vault/Step namespaces
+- Falco condicional em WSL
+- Testes de policy (`kyverno test`)
+
+## Operações auxiliares
+
+- Testar políticas localmente:
 
 ```bash
-./scripts/trust-stepca-wsl.sh
-pwsh -File scripts/trust-stepca-windows.ps1 -CertificatePath .\\.secrets\\step-ca\\root_ca.crt
+make policy-test
 ```
 
-## Verify and teardown
-
-```bash
-make verify-quick
-make verify
-make down
-```
-
-## GitOps source override
-
-By default, `make reconcile` prepares a local rendered git daemon and uses it as `REPO_URL`.
-
-If you need an explicit repository and revision:
-
-```bash
-make reconcile REPO_URL=https://github.com/your-org/secure-gitops-platform.git GITOPS_REVISION=main
-```
-
-## Promotion by PR
-
-Use digest promotion helpers before opening PRs:
+- Promover digest entre ambientes:
 
 ```bash
 ./scripts/promote-image.sh dev homolog
 ./scripts/promote-image.sh homolog prod
 ```
+
+- Sincronizar imagem para registry local:
+
+```bash
+./scripts/sync-image-to-local-registry.sh <imagem@sha256:...> localhost:5001
+```
+
+## Teardown e limpeza
+
+```bash
+make down
+make clean
+```
+
+## Troubleshooting rápido
+
+- Rollout degradado: `runbooks/rollout-degraded.md`
+- Policy deny: `runbooks/policy-deny.md`
+- Vault sealed: `runbooks/vault-sealed.md`
+- Step-issuer conectividade: `runbooks/step-issuer-connectivity.md`
+- Falco indisponível em WSL: `runbooks/falco-unavailable-wsl.md`
+- Falha de sync do registry: `runbooks/registry-sync-failed.md`

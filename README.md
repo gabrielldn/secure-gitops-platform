@@ -1,88 +1,154 @@
-# secure-gitops-platform
+# Secure GitOps Platform
 
-Production-like local Kubernetes platform for WSL using `k3d` + 3 clusters (`dev`, `homolog`, `prod`) with:
+[![Licença MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-yellow.svg)](LICENSE)
+![WSL Ubuntu 24.04](https://img.shields.io/badge/WSL-Ubuntu%2024.04-E95420?logo=ubuntu&logoColor=white)
+![k3d 3 clusters](https://img.shields.io/badge/k3d-3%20clusters-326CE5?logo=kubernetes&logoColor=white)
+![Kubernetes v1.31.5](https://img.shields.io/badge/Kubernetes-v1.31.5-326CE5?logo=kubernetes&logoColor=white)
+![PR Policy](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/pr.yml?branch=main&label=PR%20Policy)
+![Release Supply Chain](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/release.yml?label=Release%20Supply%20Chain)
 
-- GitOps: ArgoCD + ApplicationSet (hub-and-spoke)
-- Progressive Delivery: Argo Rollouts (canary + analysis + rollback)
-- Policy as Code: Kyverno (baseline + supply chain gates)
-- Secrets and PKI: Vault + External Secrets + Step-CA + step-issuer
-- Supply Chain Security: SBOM, image scan, cosign signatures, SLSA-style attestation
-- Runtime Security: Trivy Operator (+ Falco best-effort on WSL)
-- Observability: Prometheus/Loki/Tempo + OpenTelemetry Collector
+Plataforma Kubernetes local `production-like` para laboratório DevSecOps em WSL, com `k3d` + 3 clusters (`sgp-dev`, `sgp-homolog`, `sgp-prod`), GitOps central, políticas de segurança, supply chain, PKI, gestão de segredos, rollout progressivo e observabilidade.
 
-## Repository contracts
+## Objetivo do projeto
 
-- `Makefile` is the operational entrypoint.
-- `platform/versions.lock.yaml` pins CLI/chart/image versions.
-- `platform/profiles/{full,light}.yaml` controls host sizing expectations.
-- `gitops/bootstrap/` contains ArgoCD projects and root ApplicationSet.
-- `gitops/clusters/{dev,homolog,prod}/` defines cluster-specific Application sets.
-- Deployments should use immutable image digests.
+Entregar um ambiente reproduzível para praticar e demonstrar:
 
-## Quick start
+- GitOps multi-cluster com governança por ambiente.
+- Progressive delivery com rollback automático.
+- Policy-as-code e controles de admissão.
+- Supply chain security (SBOM, scan, assinatura e attestation).
+- Gestão de segredos com Vault + External Secrets.
+- PKI interna com Step-CA + step-issuer.
+- Observabilidade e SLO operacional.
 
-1. Check prerequisites and host profile:
+## Stack principal
+
+- Orquestração local: `k3d` + registry local (`localhost:5001`).
+- GitOps: Argo CD + ApplicationSet.
+- Delivery: Argo Rollouts.
+- Policy-as-code: Kyverno.
+- Segredos: Vault + External Secrets Operator.
+- PKI: cert-manager + Step-CA + step-issuer.
+- Runtime security: Trivy Operator + Falco (best-effort em WSL).
+- Observabilidade: kube-prometheus-stack, Loki, Tempo, OpenTelemetry Collector.
+- Supply chain: Syft, Grype, Trivy, Cosign, proveniência estilo SLSA.
+
+## Topologia resumida
+
+- `sgp-dev` (hub): Argo CD central, Vault, Step-CA, observabilidade central e workloads de dev.
+- `sgp-homolog` (spoke): workloads e operadores de homolog.
+- `sgp-prod` (spoke): workloads e operadores de prod.
+
+Portas locais relevantes no host:
+
+- Ingress `dev`: `8081` (HTTP), `8444` (HTTPS)
+- Ingress `homolog`: `8082` (HTTP), `8445` (HTTPS)
+- Ingress `prod`: `8083` (HTTP), `8446` (HTTPS)
+- Vault hub (via LB dev): `http://host.k3d.internal:18200`
+- Step-CA hub (via LB dev): `https://host.k3d.internal:19443`
+
+## Contratos do repositório
+
+- Operação: `Makefile` (`make doctor`, `make up`, `make reconcile`, `make verify`, etc.).
+- Versões pinadas: `platform/versions.lock.yaml`.
+- Perfis de sizing: `platform/profiles/light.yaml` e `platform/profiles/full.yaml`.
+- Bootstrap GitOps: `gitops/bootstrap/`.
+- Fonte de verdade por ambiente: `gitops/clusters/{dev,homolog,prod}/`.
+- Políticas: `policies/kyverno/` + testes em `policies/tests/kyverno/`.
+- SLO e alertas: `slo/`.
+- Runbooks operacionais: `runbooks/`.
+
+## Começando rápido (fluxo recomendado)
+
+1. Validar host e ferramentas:
 
 ```bash
 make doctor PROFILE=light
 ```
 
-2. Install toolchain:
+2. Instalar toolchain (quando necessário):
 
 ```bash
 make bootstrap
 ```
 
-If `make` is not installed yet:
-
-```bash
-cd ansible
-ansible-playbook playbooks/bootstrap.yml --ask-become-pass
-```
-
-3. Provision registry + clusters:
+3. Subir registry + clusters:
 
 ```bash
 make up PROFILE=light
 ```
 
-4. Bootstrap ArgoCD and converge critical GitOps apps:
+4. Bootstrap GitOps e convergência inicial:
 
 ```bash
-make reconcile
+make reconcile PROFILE=light
 ```
 
-5. Initialize Vault/Step-CA bootstrap material and configure ESO auth:
+5. Material de segredos/PKI:
 
 ```bash
 make vault-bootstrap
 make vault-configure
 make stepca-bootstrap
 ./scripts/render-step-issuer-values.sh
+make reconcile PROFILE=light
 ```
 
-6. Verify platform status:
+6. Verificação:
 
 ```bash
-make verify-quick
-make verify
+make verify-quick PROFILE=light
+make verify PROFILE=light
 ```
 
-7. Teardown:
+7. Desligar ambiente:
 
 ```bash
 make down
 ```
 
-## Important docs
+## Comandos `make`
 
-- Prerequisites: `docs/prerequisites.md`
-- Operations: `docs/operations.md`
-- Self-hosted runner: `docs/runner-self-hosted.md`
-- Optional ACME flow: `docs/pki-acme-optional.md`
+- `make doctor`: valida pré-requisitos, perfil e versões de chart.
+- `make versions`: imprime matriz pinada de versões.
+- `make bootstrap`: instala toolchain local via Ansible.
+- `make up`: sobe registry + 3 clusters k3d.
+- `make gitops-bootstrap`: instala Argo CD e registra clusters.
+- `make reconcile`: bootstrap GitOps + espera de convergência dos apps críticos.
+- `make vault-bootstrap`: inicializa Vault e guarda bootstrap cifrado.
+- `make vault-configure`: configura auth/policies do Vault para ESO.
+- `make stepca-bootstrap`: extrai material de bootstrap do Step-CA para `.secrets` cifrada.
+- `make verify-quick`: health-check essencial.
+- `make verify`: verificação E2E (inclui issuer pronto em todos os clusters).
+- `make down`: remove clusters e registry local.
+- `make clean`: limpeza local previsível.
 
-## Notes
+## CI/CD e supply chain
 
-- Falco is optional/best-effort in WSL; fallback controls remain mandatory.
-- Step-issuer is the primary certificate path. ACME is optional.
-- Vault bootstrap material is encrypted with SOPS+age under `.secrets/`.
+Workflows em `.github/workflows/`:
+
+- `pr.yml`: validação de manifestos, testes de policy e scan de configuração.
+- `release.yml`: build, SBOM (Syft), scans (Grype/Trivy), assinatura (Cosign), attestation.
+- `local-registry-sync.yml`: sincronização manual de imagem por digest para registry local.
+
+## Segurança
+
+- Política de reporte: `SECURITY.md`.
+- Licença: `LICENSE` (MIT).
+- Material sensível de bootstrap fica em `.secrets/` cifrado com `SOPS + age`.
+- `Falco` em WSL é tratado como `best-effort`; fallback obrigatório com Trivy + policies + alertas.
+
+## Documentação
+
+- Índice de documentação: `docs/README.md`
+- Pré-requisitos: `docs/prerequisites.md`
+- Arquitetura: `docs/architecture.md`
+- Operação: `docs/operations.md`
+- Runner self-hosted: `docs/runner-self-hosted.md`
+- PKI ACME opcional: `docs/pki-acme-optional.md`
+
+## Observações práticas
+
+- O perfil padrão para convergência local é `light`.
+- `make vault-bootstrap` é operação de bootstrap inicial; se já existir `.secrets/vault/init.enc.json`, o comando falha por proteção (comportamento esperado).
+- O fluxo recomendado é sempre concluir com `make verify`.

@@ -34,7 +34,7 @@ jobs:
       - name: Install Conftest
         run: |
           VERSION=v0.57.0
-          ARCH=amd64
+          ARCH=x86_64
           curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/${VERSION}/conftest_${VERSION#v}_Linux_${ARCH}.tar.gz" -o conftest.tgz
           tar -xzf conftest.tgz conftest
           chmod +x conftest

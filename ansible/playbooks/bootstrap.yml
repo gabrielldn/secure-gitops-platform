@@ -2,6 +2,7 @@
 - name: Bootstrap secure-gitops-platform host
   hosts: local
   gather_facts: true
+  become: true
   vars_files:
     - ../group_vars/all.yml
 

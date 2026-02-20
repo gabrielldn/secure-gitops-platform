@@ -57,6 +57,8 @@ Para instalar automaticamente (incluindo `make`):
 make bootstrap
 ```
 
+Quando o comando pedir `BECOME password:`, use a senha do seu usuário no `sudo` do WSL.
+
 ## Verificação inicial
 
 ```bash

@@ -26,6 +26,8 @@ Você pode preparar o ambiente com:
 make bootstrap
 ```
 
+Se aparecer `BECOME password:`, informe a senha de `sudo` do WSL.
+
 ## Registro do runner (resumo)
 
 1. No GitHub do repositório: `Settings -> Actions -> Runners -> New self-hosted runner`.

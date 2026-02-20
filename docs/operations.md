@@ -15,6 +15,8 @@ Se faltar toolchain:
 make bootstrap
 ```
 
+No `make bootstrap`, o prompt `BECOME password:` pede a senha de `sudo` do usuário atual no WSL.
+
 ### 2) Provisionamento local
 
 ```bash

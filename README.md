@@ -72,6 +72,8 @@ make doctor PROFILE=light
 make bootstrap
 ```
 
+Durante esse passo, quando aparecer `BECOME password:`, informe a senha do seu usuário no `sudo` do WSL (não é senha do GitHub, token nem senha de Vault).
+
 3. Subir registry + clusters:
 
 ```bash
@@ -150,5 +152,6 @@ Workflows em `.github/workflows/`:
 ## Observações práticas
 
 - O perfil padrão para convergência local é `light`.
+- O prompt `BECOME password:` no `make bootstrap` corresponde à senha de `sudo` do WSL.
 - `make vault-bootstrap` é operação de bootstrap inicial; se já existir `.secrets/vault/init.enc.json`, o comando falha por proteção (comportamento esperado).
 - O fluxo recomendado é sempre concluir com `make verify`.

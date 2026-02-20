@@ -2,6 +2,8 @@ SHELL := /usr/bin/env bash
 ROOT_DIR := $(shell pwd)
 PROFILE ?= light
 ANSIBLE_PLAYBOOK ?= ansible-playbook
+ANSIBLE_INVENTORY ?= $(ROOT_DIR)/ansible/inventory/localhost.ini
+ANSIBLE_LIMIT ?= local
 KUBECONFIG_FILE := $(ROOT_DIR)/.kube/config
 REPO_URL ?=
 GITOPS_REVISION ?= main
@@ -35,7 +37,13 @@ versions:
 	@./scripts/print-versions.sh
 
 bootstrap:
-	@cd ansible && $(ANSIBLE_PLAYBOOK) playbooks/bootstrap.yml --ask-become-pass
+	@echo "[INFO] When prompted with 'BECOME password:', use your WSL sudo password."
+	@$(ANSIBLE_PLAYBOOK) \
+		-i "$(ANSIBLE_INVENTORY)" \
+		"$(ROOT_DIR)/ansible/playbooks/bootstrap.yml" \
+		--limit "$(ANSIBLE_LIMIT)" \
+		--become \
+		--ask-become-pass
 
 up:
 	@PROFILE=$(PROFILE) ./scripts/cluster-up.sh

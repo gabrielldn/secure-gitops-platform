@@ -6,9 +6,27 @@ O projeto implementa um laboratório Kubernetes local com governança GitOps e s
 
 Topologia:
 
-- `sgp-dev`: cluster hub (plataforma central)
-- `sgp-homolog`: cluster spoke
-- `sgp-prod`: cluster spoke
+- `sgp-dev`: cluster hub (plataforma central).
+- `sgp-homolog`: cluster spoke.
+- `sgp-prod`: cluster spoke.
+
+## Fluxo principal (supply chain + runtime)
+
+```mermaid
+flowchart LR
+    A[GitHub Actions CI] --> B[Build + SBOM + Scans]
+    B --> C[GHCR image@digest]
+    C --> D[Cosign Sign]
+    D --> E[Cosign Attest<br/>SPDX + SLSA]
+    E --> F[Argo CD ApplicationSet]
+    F --> G[Kyverno verifyImages]
+    G --> H[Argo Rollouts Canary]
+    H --> I[AnalysisTemplate Prometheus]
+    I --> J[Rollback automático ou promoção]
+    J --> K[Prometheus]
+    J --> L[Loki]
+    J --> M[Tempo]
+```
 
 ## Componentes por domínio
 
@@ -43,8 +61,8 @@ Fonte de verdade:
 
 Modelo de projetos Argo CD:
 
-- `platform-core`: operadores e componentes de plataforma.
-- `workloads-dev`, `workloads-homolog`, `workloads-prod`: workloads por ambiente.
+- `platform-core`: operadores e componentes de plataforma (destinos `sgp-*-platform`).
+- `workloads-dev`, `workloads-homolog`, `workloads-prod`: workloads por ambiente (destinos `sgp-*-workloads`).
 
 Promoção:
 
@@ -54,14 +72,15 @@ Promoção:
 
 Matriz de enforcement de policy:
 
-- `dev`: auditoria.
-- `homolog`: enforcement parcial (supply chain pode operar em audit).
+- `dev`: auditoria para políticas de baseline e supply chain.
+- `homolog`: enforcement para `verifyImages` e validação pré-produção.
 - `prod`: enforcement total.
 
 Pipeline de artefato:
 
 - Build e publicação em GHCR (source of truth).
 - SBOM + scan + assinatura + attestation.
+- Verificação (`cosign verify` e `cosign verify-attestation`) com chave pública.
 - Deploy por digest.
 - Sync opcional para registry local (`localhost:5001`).
 

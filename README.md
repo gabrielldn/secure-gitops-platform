@@ -57,6 +57,8 @@ Portas locais relevantes no host:
 - Políticas: `policies/kyverno/` + testes em `policies/tests/kyverno/`.
 - SLO e alertas: `slo/`.
 - Runbooks operacionais: `runbooks/`.
+- Evidências reproduzíveis: `make evidence` em `artifacts/evidence/`.
+- Governança técnica: `docs/adr/`, `CONTRIBUTING.md`, `CODEOWNERS`.
 
 ## Começando rápido (fluxo recomendado)
 
@@ -115,6 +117,12 @@ make verify PROFILE=light
 make down
 ```
 
+8. Gerar evidências do supply chain:
+
+```bash
+make evidence IMAGE_REF=ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest>
+```
+
 ## Comandos `make`
 
 - `make doctor`: valida pré-requisitos, perfil e versões de chart.
@@ -129,6 +137,8 @@ make down
 - `make stepca-bootstrap`: extrai material de bootstrap do Step-CA para `.secrets` cifrada.
 - `make verify-quick`: health-check essencial.
 - `make verify`: verificação E2E (inclui issuer pronto em todos os clusters).
+- `make evidence`: pacote de evidência (cosign verify, attestations, SBOM, scans, policy reports).
+- `make sanitize-check`: auditoria não-destrutiva para publicação pública sanitizada.
 - `make down`: remove clusters e registry local.
 - `make clean`: limpeza local previsível.
 
@@ -137,7 +147,7 @@ make down
 Workflows em `.github/workflows/`:
 
 - `pr.yml`: validação de manifestos, testes de policy e scan de configuração.
-- `release.yml`: build, SBOM (Syft), scans (Grype/Trivy), assinatura (Cosign), attestation.
+- `release.yml`: build, SBOM (Syft), scans (Grype/Trivy), assinatura (Cosign), attestation e verificações pós-assinatura.
 - `local-registry-sync.yml`: sincronização manual de imagem por digest para registry local.
 
 ## Segurança
@@ -146,6 +156,7 @@ Workflows em `.github/workflows/`:
 - Licença: `LICENSE` (MIT).
 - Material sensível de bootstrap fica em `.secrets/` cifrado com `SOPS + age`.
 - `Falco` em WSL é tratado como `best-effort`; fallback obrigatório com Trivy + policies + alertas.
+- Auditoria para publicação pública: `make sanitize-check`.
 
 ## Documentação
 
@@ -153,8 +164,13 @@ Workflows em `.github/workflows/`:
 - Pré-requisitos: `docs/prerequisites.md`
 - Arquitetura: `docs/architecture.md`
 - Operação: `docs/operations.md`
+- Demo reproduzível: `docs/demo.md`
+- Modelo de segurança: `docs/security-model.md`
+- Checklist de sanitização pública: `docs/public-sanitization-checklist.md`
+- ADRs: `docs/adr/`
 - Runner self-hosted: `docs/runner-self-hosted.md`
 - PKI ACME opcional: `docs/pki-acme-optional.md`
+- Contribuição e ownership: `CONTRIBUTING.md` e `CODEOWNERS`
 
 ## Observações práticas
 

@@ -10,6 +10,10 @@ GITOPS_REVISION ?= main
 ARGO_WAIT_TIMEOUT ?= 1800
 RECONCILE_VERBOSE ?= true
 RECONCILE_POLL_INTERVAL ?= 10
+IMAGE_REF ?=
+COSIGN_PUBLIC_KEY_FILE ?=
+EVIDENCE_DIR ?=
+EVIDENCE_INCLUDE_CLUSTER ?= true
 
 .DEFAULT_GOAL := help
 
@@ -27,6 +31,8 @@ help:
 	@echo "  make verify-quick      - Run quick platform health checks"
 	@echo "  make verify            - Run end-to-end verification checks"
 	@echo "  make policy-test       - Run kyverno and conftest tests"
+	@echo "  make evidence          - Generate supply-chain evidence pack (IMAGE_REF=... COSIGN_PUBLIC_KEY_FILE=... EVIDENCE_DIR=... EVIDENCE_INCLUDE_CLUSTER=true|false)"
+	@echo "  make sanitize-check    - Run non-destructive public/sanitization audit"
 	@echo "  make down              - Delete local clusters and registry"
 	@echo "  make clean             - Remove generated local artifacts"
 
@@ -75,9 +81,19 @@ policy-test:
 	@kyverno test policies/tests/kyverno
 	@conftest test gitops/apps/workloads/podinfo/base --policy policies/conftest
 
+evidence:
+	@./scripts/evidence.sh \
+		--image-ref "$(IMAGE_REF)" \
+		$(if $(COSIGN_PUBLIC_KEY_FILE),--key-file "$(COSIGN_PUBLIC_KEY_FILE)") \
+		$(if $(EVIDENCE_DIR),--output-dir "$(EVIDENCE_DIR)") \
+		$(if $(filter false no 0,$(EVIDENCE_INCLUDE_CLUSTER)),--no-cluster,--include-cluster)
+
+sanitize-check:
+	@./scripts/sanitize-audit.sh
+
 down:
 	@./scripts/cluster-down.sh
 
 clean: down
-	@rm -rf .tmp
+	@rm -rf .tmp artifacts
 	@echo "clean complete"

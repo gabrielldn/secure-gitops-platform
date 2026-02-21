@@ -33,7 +33,7 @@ spec:
   sourceRepos:
     - '*'
   destinations:
-    - name: sgp-dev-platform
+    - name: sgp-dev-workloads
       namespace: apps
   clusterResourceWhitelist:
     - group: ''
@@ -52,7 +52,7 @@ spec:
   sourceRepos:
     - '*'
   destinations:
-    - name: sgp-homolog-platform
+    - name: sgp-homolog-workloads
       namespace: apps
   clusterResourceWhitelist:
     - group: ''
@@ -71,7 +71,7 @@ spec:
   sourceRepos:
     - '*'
   destinations:
-    - name: sgp-prod-platform
+    - name: sgp-prod-workloads
       namespace: apps
   clusterResourceWhitelist:
     - group: ''

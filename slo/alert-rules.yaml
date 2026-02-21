@@ -21,7 +21,7 @@ spec:
             severity: critical
           annotations:
             summary: "Podinfo burn rate is too high (fast window)"
-            runbook_url: "runbooks/rollout-degraded.md"
+            runbook_url: "runbooks/podinfo-availability-burn-rate-fast.md"
         - alert: PodinfoAvailabilityBurnRateSlow
           expr: |
             (
@@ -36,7 +36,7 @@ spec:
             severity: warning
           annotations:
             summary: "Podinfo burn rate is elevated (slow window)"
-            runbook_url: "runbooks/rollout-degraded.md"
+            runbook_url: "runbooks/podinfo-availability-burn-rate-slow.md"
     - name: podinfo-latency
       rules:
         - alert: PodinfoP95LatencyHigh

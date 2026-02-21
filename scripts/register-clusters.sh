@@ -130,7 +130,7 @@ YAML
   local platform_token
   local workloads_token
   platform_token="$(kubectl --context "$ctx" -n argocd create token "$platform_sa" --duration=24h)"
-  workloads_token="$platform_token"
+  workloads_token="$(kubectl --context "$ctx" -n argocd create token "$workloads_sa" --duration=24h)"
 
   local server
   local ca_data
@@ -141,7 +141,7 @@ YAML
   server="${server/https:\/\/0.0.0.0:/https://host.k3d.internal:}"
 
   create_cluster_secret "$env" "platform" "$platform_token" "$server" "$ca_data"
-  kubectl --context "$DEV_CONTEXT" -n argocd delete secret "cluster-sgp-${env}-workloads" --ignore-not-found >/dev/null 2>&1 || true
+  create_cluster_secret "$env" "workloads" "$workloads_token" "$server" "$ca_data"
 }
 
 # Cleanup old registration objects from previous layout.

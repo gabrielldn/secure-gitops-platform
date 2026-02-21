@@ -41,10 +41,10 @@ jobs:
         run: syft "${{ steps.image.outputs.image_ref }}" -o spdx-json=sbom.spdx.json
 
       - name: Scan image (Grype)
-        run: grype "${{ steps.image.outputs.image_ref }}" --fail-on high
+        run: grype "${{ steps.image.outputs.image_ref }}" --fail-on high -o json > grype.json
 
       - name: Scan image (Trivy)
-        run: trivy image --exit-code 1 --severity HIGH,CRITICAL "${{ steps.image.outputs.image_ref }}"
+        run: trivy image --format json --output trivy.json --exit-code 1 --severity HIGH,CRITICAL "${{ steps.image.outputs.image_ref }}"
 
       - name: Prepare signing key
         run: |
@@ -82,6 +82,20 @@ jobs:
       - name: Attach SLSA attestation
         run: cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
 
+      - name: Export image metadata
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${{ steps.image.outputs.image_ref }}" > image-ref.txt
+          printf '%s\n' "${{ steps.image.outputs.image_digest }}" > image-digest.txt
+
+      - name: Verify signature and attestations (Cosign)
+        run: |
+          set -euo pipefail
+          cosign public-key --key cosign.key > cosign.pub
+          cosign verify --key cosign.pub "${{ steps.image.outputs.image_ref }}" > cosign-verify-signature.txt
+          cosign verify-attestation --key cosign.pub --type spdx "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-spdx.txt
+          cosign verify-attestation --key cosign.pub --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+
       - name: Optional local registry sync
         run: |
           if [[ "${ENABLE_LOCAL_SYNC}" == "true" ]]; then
@@ -95,3 +109,11 @@ jobs:
           path: |
             sbom.spdx.json
             provenance.json
+            grype.json
+            trivy.json
+            image-ref.txt
+            image-digest.txt
+            cosign.pub
+            cosign-verify-signature.txt
+            cosign-verify-attestation-spdx.txt
+            cosign-verify-attestation-slsa.txt

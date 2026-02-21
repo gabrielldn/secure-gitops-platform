@@ -18,5 +18,5 @@
 ## Notes
 
 - `dev`: expected audit-only behavior.
-- `homolog`: partial enforce.
-- `prod`: full enforce.
+- `homolog`: enforce para políticas de `verifyImages` (assinatura/attestation).
+- `prod`: enforce completo.

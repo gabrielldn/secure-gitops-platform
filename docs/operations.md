@@ -123,6 +123,29 @@ make policy-test
 ./scripts/promote-image.sh homolog prod
 ```
 
+- Gerar pacote de evidência (SBOM, scan, verify e policy reports):
+
+```bash
+make evidence IMAGE_REF=ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest>
+```
+
+Comportamento:
+
+- Saída padrão em `artifacts/evidence/<UTC-YYYYMMDDTHHMMSSZ>/`.
+- Use `COSIGN_PUBLIC_KEY_FILE=<arquivo>` para chave explícita.
+- Use `EVIDENCE_DIR=<diretorio>` para saída customizada.
+- Use `EVIDENCE_INCLUDE_CLUSTER=false` para pular export de policy reports.
+
+- Rodar auditoria de sanitização para publicação pública:
+
+```bash
+make sanitize-check
+```
+
+Relatório:
+
+- `artifacts/sanitization/report.md`
+
 - Sincronizar imagem para registry local:
 
 ```bash
@@ -139,6 +162,8 @@ make clean
 ## Troubleshooting rápido
 
 - Rollout degradado: `runbooks/rollout-degraded.md`
+- Burn-rate fast: `runbooks/podinfo-availability-burn-rate-fast.md`
+- Burn-rate slow: `runbooks/podinfo-availability-burn-rate-slow.md`
 - Policy deny: `runbooks/policy-deny.md`
 - Vault sealed: `runbooks/vault-sealed.md`
 - Step-issuer conectividade: `runbooks/step-issuer-connectivity.md`

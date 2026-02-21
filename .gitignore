@@ -2,6 +2,7 @@
 .kube/
 .secrets/
 .tmp/
+artifacts/
 
 # Local env and state
 .env

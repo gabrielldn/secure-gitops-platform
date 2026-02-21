@@ -365,7 +365,7 @@ metadata:
 spec:
   project: workloads-prod
   destination:
-    name: sgp-prod-platform
+    name: sgp-prod-workloads
     namespace: apps
   source:
     repoURL: __REPO_URL__

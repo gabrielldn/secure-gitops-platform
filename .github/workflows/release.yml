@@ -108,30 +108,40 @@ jobs:
       - name: Scan image (Trivy)
         run: trivy image --format json --output trivy.json --exit-code 1 --severity HIGH,CRITICAL "${{ steps.image.outputs.image_ref }}"
 
-      - name: Prepare signing key
+      - name: Prepare signing context
         run: |
           set -euo pipefail
           if [[ -n "${COSIGN_PRIVATE_KEY:-}" ]]; then
             printf '%s\n' "$COSIGN_PRIVATE_KEY" > cosign.key
+            chmod 600 cosign.key
+            echo "SIGNING_MODE=key" >> "$GITHUB_ENV"
           elif [[ -n "${VAULT_ADDR:-}" && -n "${VAULT_TOKEN:-}" ]]; then
-            if ! command -v vault >/dev/null 2>&1; then
-              echo "vault CLI not found and COSIGN_PRIVATE_KEY not provided"
-              exit 1
+            if command -v vault >/dev/null 2>&1; then
+              vault login "$VAULT_TOKEN" >/dev/null
+              vault kv get -field=private_key kv/cicd/cosign > cosign.key
+              chmod 600 cosign.key
+              echo "SIGNING_MODE=key" >> "$GITHUB_ENV"
+            else
+              echo "Vault credentials provided but vault CLI is unavailable; falling back to keyless signing."
+              echo "SIGNING_MODE=keyless" >> "$GITHUB_ENV"
             fi
-            vault login "$VAULT_TOKEN" >/dev/null
-            vault kv get -field=private_key kv/cicd/cosign > cosign.key
           else
-            echo "No cosign key source found (COSIGN_PRIVATE_KEY or Vault credentials)."
-            exit 1
+            echo "No signing key configured; using keyless signing with GitHub OIDC."
+            echo "SIGNING_MODE=keyless" >> "$GITHUB_ENV"
           fi
-          chmod 600 cosign.key
         env:
           VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
           VAULT_TOKEN: ${{ secrets.VAULT_TOKEN }}
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
 
       - name: Sign image (Cosign)
-        run: cosign sign --yes --tlog-upload=false --key cosign.key "${{ steps.image.outputs.image_ref }}"
+        run: |
+          set -euo pipefail
+          if [[ "${SIGNING_MODE}" == "key" ]]; then
+            cosign sign --yes --tlog-upload=false --key cosign.key "${{ steps.image.outputs.image_ref }}"
+          else
+            cosign sign --yes "${{ steps.image.outputs.image_ref }}"
+          fi
 
       - name: Generate provenance predicate
         run: |
@@ -143,10 +153,22 @@ jobs:
           sed -i "s#OWNER/REPO#${GITHUB_REPOSITORY}#g" provenance.json
 
       - name: Attach SBOM attestation
-        run: cosign attest --yes --tlog-upload=false --key cosign.key --predicate sbom.spdx.json --type spdx "${{ steps.image.outputs.image_ref }}"
+        run: |
+          set -euo pipefail
+          if [[ "${SIGNING_MODE}" == "key" ]]; then
+            cosign attest --yes --tlog-upload=false --key cosign.key --predicate sbom.spdx.json --type spdx "${{ steps.image.outputs.image_ref }}"
+          else
+            cosign attest --yes --predicate sbom.spdx.json --type spdx "${{ steps.image.outputs.image_ref }}"
+          fi
 
       - name: Attach SLSA attestation
-        run: cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+        run: |
+          set -euo pipefail
+          if [[ "${SIGNING_MODE}" == "key" ]]; then
+            cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+          else
+            cosign attest --yes --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+          fi
 
       - name: Export image metadata
         run: |
@@ -157,10 +179,28 @@ jobs:
       - name: Verify signature and attestations (Cosign)
         run: |
           set -euo pipefail
-          cosign public-key --key cosign.key > cosign.pub
-          cosign verify --key cosign.pub "${{ steps.image.outputs.image_ref }}" > cosign-verify-signature.txt
-          cosign verify-attestation --key cosign.pub --type spdx "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-spdx.txt
-          cosign verify-attestation --key cosign.pub --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+          if [[ "${SIGNING_MODE}" == "key" ]]; then
+            cosign public-key --key cosign.key > cosign.pub
+            cosign verify --key cosign.pub "${{ steps.image.outputs.image_ref }}" > cosign-verify-signature.txt
+            cosign verify-attestation --key cosign.pub --type spdx "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-spdx.txt
+            cosign verify-attestation --key cosign.pub --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+          else
+            printf '%s\n' "KEYLESS (OIDC)" > cosign.pub
+            IDENTITY_REGEX="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*$"
+            ISSUER="https://token.actions.githubusercontent.com"
+            cosign verify \
+              --certificate-oidc-issuer "${ISSUER}" \
+              --certificate-identity-regexp "${IDENTITY_REGEX}" \
+              "${{ steps.image.outputs.image_ref }}" > cosign-verify-signature.txt
+            cosign verify-attestation \
+              --certificate-oidc-issuer "${ISSUER}" \
+              --certificate-identity-regexp "${IDENTITY_REGEX}" \
+              --type spdx "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-spdx.txt
+            cosign verify-attestation \
+              --certificate-oidc-issuer "${ISSUER}" \
+              --certificate-identity-regexp "${IDENTITY_REGEX}" \
+              --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+          fi
 
       - name: Optional local registry sync
         run: |

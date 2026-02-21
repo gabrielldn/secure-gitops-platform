@@ -30,6 +30,18 @@ check_pattern() {
   fi
 }
 
+check_pattern_in_path() {
+  local category="$1"
+  local pattern="$2"
+  local path="$3"
+  local matches
+
+  matches="$(git -C "$ROOT_DIR" grep -nI -E -e "$pattern" -- "$path" || true)"
+  if [[ -n "$matches" ]]; then
+    add_finding "$category" "$matches"
+  fi
+}
+
 tracked_sensitive_paths="$(git -C "$ROOT_DIR" ls-files '.secrets/**' || true)"
 if [[ -n "$tracked_sensitive_paths" ]]; then
   add_finding "tracked-.secrets" "$tracked_sensitive_paths"
@@ -52,6 +64,21 @@ check_pattern "github-classic-token" 'ghp_[A-Za-z0-9]{36}'
 check_pattern "github-fine-grained-token" 'github_pat_[A-Za-z0-9_]{20,}'
 check_pattern "slack-token" 'xox[baprs]-[A-Za-z0-9-]{10,}'
 check_pattern "google-api-key" 'AIza[0-9A-Za-z_-]{35}'
+check_pattern_in_path "gitops-secret-manifests" '^[[:space:]]*kind:[[:space:]]*Secret([[:space:]]|$)' "gitops"
+
+step_issuer_secret_matches=""
+while IFS= read -r file; do
+  [[ -n "$file" ]] || continue
+  [[ -f "${ROOT_DIR}/${file}" ]] || continue
+  if grep -Eq 'step-issuer-provisioner-password|provisioner_password' "${ROOT_DIR}/${file}" \
+    && grep -Eq '^[[:space:]]*kind:[[:space:]]*Secret([[:space:]]|$)' "${ROOT_DIR}/${file}"; then
+    step_issuer_secret_matches+="${file}"$'\n'
+  fi
+done < <(git -C "$ROOT_DIR" ls-files gitops | grep -E '\.ya?ml$' || true)
+
+if [[ -n "$step_issuer_secret_matches" ]]; then
+  add_finding "step-issuer-password-material-in-yaml" "$step_issuer_secret_matches"
+fi
 
 {
   echo "# Public Sanitization Audit"

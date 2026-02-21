@@ -5,6 +5,7 @@ resources:
   - namespace.yaml
   - service-stable.yaml
   - service-canary.yaml
+  - podmonitor.yaml
   - rollout.yaml
   - analysis-template.yaml
   - ingress.yaml

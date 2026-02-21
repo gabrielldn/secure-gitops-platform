@@ -119,12 +119,21 @@ critical_apps=(
   homolog-cert-manager
   prod-cert-manager
   dev-vault
+  dev-kube-prometheus-stack
+  homolog-kube-prometheus-stack
+  prod-kube-prometheus-stack
   dev-step-issuer
   homolog-step-issuer
   prod-step-issuer
   dev-external-secrets
   homolog-external-secrets
   prod-external-secrets
+  dev-external-secret-config
+  homolog-external-secret-config
+  prod-external-secret-config
+  dev-step-cluster-issuer
+  homolog-step-cluster-issuer
+  prod-step-cluster-issuer
   dev-argo-rollouts
   homolog-argo-rollouts
   prod-argo-rollouts

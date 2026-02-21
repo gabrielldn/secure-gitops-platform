@@ -596,7 +596,7 @@ metadata:
   name: dev-step-cluster-issuer
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-wave: "46"
 spec:
   project: platform-core
   destination:
@@ -626,6 +626,29 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __GITOPS_REVISION__
     path: gitops/apps/workloads/podinfo/overlays/dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-demo-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+spec:
+  project: workloads-dev
+  destination:
+    name: sgp-dev-workloads
+    namespace: apps
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/workloads/demo-app/overlays/dev
   syncPolicy:
     automated:
       prune: true

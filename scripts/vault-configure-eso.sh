@@ -80,6 +80,15 @@ fi
 
 vault kv put kv/apps/podinfo message="secure-gitops-platform"
 
+step_bootstrap_enc="${ROOT_DIR}/.secrets/step-ca/bootstrap.enc.json"
+[[ -f "$step_bootstrap_enc" ]] || die "missing step-ca bootstrap material: $step_bootstrap_enc"
+step_bootstrap_tmp="$(mktemp)"
+trap 'kill $pf_pid >/dev/null 2>&1 || true; rm -f "$tmp_init" "$port_forward_log" "$step_bootstrap_tmp"' EXIT
+sops --decrypt "$step_bootstrap_enc" > "$step_bootstrap_tmp"
+step_provisioner_password="$(jq -r '.provisioner_password' "$step_bootstrap_tmp")"
+[[ -n "$step_provisioner_password" && "$step_provisioner_password" != "null" ]] || die "missing provisioner_password in step bootstrap material"
+vault kv put kv/apps/pki/step-issuer provisioner_password="$step_provisioner_password"
+
 for env in dev homolog prod; do
   ctx="k3d-sgp-${env}"
   mount="kubernetes-${env}"

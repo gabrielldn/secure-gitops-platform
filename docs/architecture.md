@@ -37,6 +37,8 @@ flowchart LR
 - PKI: Step-CA (hub) + cert-manager + step-issuer nos 3 clusters.
 - Segurança runtime: Trivy Operator obrigatório, Falco opcional em WSL.
 - Observabilidade: Prometheus/Loki/Tempo/Grafana + OTel Collector.
+  - `dev`: stack completa (Prometheus, Loki, Tempo, OTel).
+  - `homolog` e `prod`: Prometheus + OTel para análise de rollout e SLO.
 
 ## Topologia de clusters e portas
 
@@ -81,7 +83,7 @@ Pipeline de artefato:
 - Build e publicação em GHCR (source of truth).
 - SBOM + scan + assinatura + attestation.
 - Verificação (`cosign verify` e `cosign verify-attestation`) com chave pública.
-- Deploy por digest.
+- Deploy por digest no workload de demonstração (`secure-gitops-demo-app`), sem substituir o `podinfo`.
 - Sync opcional para registry local (`localhost:5001`).
 
 ## Segredos e PKI

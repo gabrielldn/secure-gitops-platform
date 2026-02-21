@@ -31,7 +31,8 @@ metadata:
 spec:
   description: Workloads for dev
   sourceRepos:
-    - '*'
+    - git://host.k3d.internal:9418/*
+    - https://github.com/*/*
   destinations:
     - name: sgp-dev-workloads
       namespace: apps
@@ -39,8 +40,18 @@ spec:
     - group: ''
       kind: Namespace
   namespaceResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: apps
+      kind: Deployment
+    - group: argoproj.io
+      kind: Rollout
+    - group: argoproj.io
+      kind: AnalysisTemplate
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: ''
+      kind: Service
+    - group: monitoring.coreos.com
+      kind: PodMonitor
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -50,7 +61,8 @@ metadata:
 spec:
   description: Workloads for homolog
   sourceRepos:
-    - '*'
+    - git://host.k3d.internal:9418/*
+    - https://github.com/*/*
   destinations:
     - name: sgp-homolog-workloads
       namespace: apps
@@ -58,8 +70,18 @@ spec:
     - group: ''
       kind: Namespace
   namespaceResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: apps
+      kind: Deployment
+    - group: argoproj.io
+      kind: Rollout
+    - group: argoproj.io
+      kind: AnalysisTemplate
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: ''
+      kind: Service
+    - group: monitoring.coreos.com
+      kind: PodMonitor
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -69,7 +91,8 @@ metadata:
 spec:
   description: Workloads for prod
   sourceRepos:
-    - '*'
+    - git://host.k3d.internal:9418/*
+    - https://github.com/*/*
   destinations:
     - name: sgp-prod-workloads
       namespace: apps
@@ -77,5 +100,15 @@ spec:
     - group: ''
       kind: Namespace
   namespaceResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: apps
+      kind: Deployment
+    - group: argoproj.io
+      kind: Rollout
+    - group: argoproj.io
+      kind: AnalysisTemplate
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: ''
+      kind: Service
+    - group: monitoring.coreos.com
+      kind: PodMonitor

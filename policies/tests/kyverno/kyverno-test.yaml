@@ -5,6 +5,8 @@ name: security-policies
 policies:
   - ../../kyverno/base/disallow-latest-tag.yaml
   - ../../kyverno/base/disallow-privileged-hostpath.yaml
+  - ../../kyverno/base/verify-image-signatures.yaml
+  - ../../kyverno/base/verify-image-attestations.yaml
 
 # list of resource files
 resources:
@@ -12,6 +14,7 @@ resources:
   - resources/good-pod.yaml
   - resources/bad-privileged-pod.yaml
   - resources/bad-hostpath-pod.yaml
+  - resources/bad-unsigned-pod.yaml
 
 # variables file (optional)
 variables:
@@ -52,5 +55,17 @@ results:
     rule: disallow-hostpath
     resource: bad-hostpath
     namespace:
+    kind: Pod
+    result: fail
+  - policy: verify-image-signatures
+    rule: require-cosign-signature
+    resource: bad-unsigned
+    namespace: apps
+    kind: Pod
+    result: fail
+  - policy: verify-image-attestations
+    rule: require-slsa-and-sbom-attestations
+    resource: bad-unsigned
+    namespace: apps
     kind: Pod
     result: fail

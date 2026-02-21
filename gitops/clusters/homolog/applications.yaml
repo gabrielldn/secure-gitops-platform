@@ -275,6 +275,45 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
+  name: homolog-kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: observability
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 66.2.1
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        grafana:
+          enabled: false
+        alertmanager:
+          enabled: false
+        kube-state-metrics:
+          enabled: false
+        prometheus-node-exporter:
+          enabled: false
+        defaultRules:
+          create: false
+        prometheus:
+          prometheusSpec:
+            retention: 2h
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
   name: homolog-cosign-public-key
   namespace: argocd
   annotations:
@@ -288,6 +327,27 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __GITOPS_REVISION__
     path: gitops/apps/security/cosign-public-key
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-slo-alerts
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "35"
+spec:
+  project: platform-core
+  destination:
+    name: sgp-homolog-platform
+    namespace: observability
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: slo
   syncPolicy:
     automated:
       prune: true
@@ -341,7 +401,7 @@ metadata:
   name: homolog-step-cluster-issuer
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "40"
+    argocd.argoproj.io/sync-wave: "46"
 spec:
   project: platform-core
   destination:
@@ -371,6 +431,29 @@ spec:
     repoURL: __REPO_URL__
     targetRevision: __GITOPS_REVISION__
     path: gitops/apps/workloads/podinfo/overlays/homolog
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homolog-demo-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "55"
+spec:
+  project: workloads-homolog
+  destination:
+    name: sgp-homolog-workloads
+    namespace: apps
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: __GITOPS_REVISION__
+    path: gitops/apps/workloads/demo-app/overlays/homolog
   syncPolicy:
     automated:
       prune: true

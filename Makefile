@@ -79,7 +79,7 @@ verify:
 
 policy-test:
 	@kyverno test policies/tests/kyverno
-	@conftest test gitops/apps/workloads/podinfo/base --policy policies/conftest
+	@conftest test gitops/apps/workloads --policy policies/conftest
 
 evidence:
 	@./scripts/evidence.sh \

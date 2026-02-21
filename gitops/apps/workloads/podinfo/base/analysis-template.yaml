@@ -17,7 +17,7 @@ spec:
               sum(rate(http_requests_total{namespace="apps",app="podinfo",code!~"5.."}[1m]))
               /
               sum(rate(http_requests_total{namespace="apps",app="podinfo"}[1m]))
-            ) or vector(1)
+            ) or vector(0)
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AnalysisTemplate
@@ -39,4 +39,4 @@ spec:
               sum by (le) (
                 rate(http_request_duration_seconds_bucket{namespace="apps",app="podinfo"}[2m])
               )
-            ) or vector(0)
+            ) or vector(999)

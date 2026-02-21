@@ -14,6 +14,12 @@ make sanitize-check
    - `artifacts/sanitization/report.md`
 3. Corrija qualquer finding crítico antes de prosseguir.
 
+Regras críticas atuais do audit:
+
+- Falha se existir `kind: Secret` versionado sob `gitops/`.
+- Falha se material de `step-issuer-provisioner-password` aparecer em manifesto `Secret`.
+- Falha para padrões clássicos de chaves/tokens em arquivos versionados.
+
 ## 2) Revisão de segredos e dados sensíveis
 
 1. Confirmar que `.secrets/` não está versionada.
@@ -21,18 +27,18 @@ make sanitize-check
    - workflows (`.github/workflows/`)
    - scripts (`scripts/`)
    - documentação (`docs/`, `README.md`)
-3. Revisar endpoints internos e substituir por placeholders quando necessário.
+3. Confirmar que o segredo do step-issuer é materializado via ESO (`ExternalSecret`) e não por `Secret` em Git.
 
 ## 3) Segurança de supply chain
 
-1. Confirmar presença de material público somente:
+1. Confirmar presença apenas de material público no repo:
    - chave pública de Cosign em `gitops/apps/security/cosign-public-key/cosign-public-key.yaml`.
 2. Confirmar ausência de chave privada Cosign no repositório.
 
 ## 4) Evidência mínima para público
 
 1. Publicar artefatos de release no GitHub Actions (SBOM, scans, verify, attestation).
-2. Garantir `docs/demo.md` com cenários reproduzíveis.
+2. Garantir `docs/demo.md` com cenário allow/deny reproduzível usando `secure-gitops-demo-app`.
 3. Garantir `docs/security-model.md` e ADRs atualizados.
 
 ## 5) Governança

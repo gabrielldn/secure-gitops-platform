@@ -35,9 +35,9 @@ Entregar um ambiente reproduzível para praticar e demonstrar:
 
 ## Topologia resumida
 
-- `sgp-dev` (hub): Argo CD central, Vault, Step-CA, observabilidade central e workloads de dev.
-- `sgp-homolog` (spoke): workloads e operadores de homolog.
-- `sgp-prod` (spoke): workloads e operadores de prod.
+- `sgp-dev` (hub): Argo CD central, Vault, Step-CA, observabilidade completa e workloads de dev.
+- `sgp-homolog` (spoke): workloads, operadores e Prometheus para análise de rollout/SLO.
+- `sgp-prod` (spoke): workloads, operadores e Prometheus para análise de rollout/SLO.
 
 Portas locais relevantes no host:
 
@@ -98,8 +98,8 @@ make reconcile PROFILE=light RECONCILE_VERBOSE=false
 
 ```bash
 make vault-bootstrap
-make vault-configure
 make stepca-bootstrap
+make vault-configure
 ./scripts/render-step-issuer-values.sh
 make reconcile PROFILE=light
 ```
@@ -145,7 +145,7 @@ Esse fluxo evita erro de digest incorreto e garante que `cosign verify` use a ch
 - `make reconcile`: bootstrap GitOps + espera de convergência dos apps críticos.
   - Verbose é padrão; use `RECONCILE_VERBOSE=false` para reduzir logs e `RECONCILE_POLL_INTERVAL=<segundos>` para ajustar intervalo de atualização.
 - `make vault-bootstrap`: inicializa Vault e guarda bootstrap cifrado.
-- `make vault-configure`: configura auth/policies do Vault para ESO.
+- `make vault-configure`: configura auth/policies do Vault para ESO e publica `kv/apps/pki/step-issuer`.
 - `make stepca-bootstrap`: extrai material de bootstrap do Step-CA para `.secrets` cifrada.
 - `make verify-quick`: health-check essencial.
 - `make verify`: verificação E2E (inclui issuer pronto em todos os clusters).

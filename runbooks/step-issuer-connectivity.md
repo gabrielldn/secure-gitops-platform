@@ -2,24 +2,27 @@
 
 ## Symptoms
 
-- `StepClusterIssuer` in `homolog`/`prod` not ready.
-- Errors connecting to `https://host.k3d.internal:19443`.
+- `StepClusterIssuer` em `homolog`/`prod` não fica `Ready`.
+- Erros de conexão para `https://host.k3d.internal:19443`.
 
-## Actions
+## Ações
 
-1. Validate Step-CA on hub:
+1. Validar Step-CA no hub:
    - `kubectl --context k3d-sgp-dev -n step-ca get pods`
    - `kubectl --context k3d-sgp-dev -n step-ca get svc`
-2. Validate dev hub host port mapping:
+2. Validar mapeamento de porta no hub:
    - `kubectl --context k3d-sgp-dev get nodes -o wide`
    - `curl -vk https://host.k3d.internal:19443/health`
-3. Re-bootstrap and render issuer material:
+3. Re-gerar material cifrado do Step-CA:
    - `make stepca-bootstrap`
+4. Re-publicar segredos no Vault para ESO:
+   - `make vault-configure`
+5. Re-renderizar manifests do issuer (somente `kid`, `caBundle`, `url`):
    - `./scripts/render-step-issuer-values.sh`
-4. Re-sync Argo applications:
-   - `make reconcile`
+6. Reconciliar GitOps:
+   - `make reconcile PROFILE=light`
 
 ## Notes
 
-- Step-CA root trust material is in `.secrets/step-ca/`.
-- Keep bootstrap payload encrypted (`bootstrap.enc.json` via SOPS+age).
+- Material sensível fica em `.secrets/step-ca/` e permanece cifrado (`bootstrap.enc.json` via SOPS+age).
+- O `Secret` `step-issuer-provisioner-password` deve ser criado por `ExternalSecret` em `cert-manager`.

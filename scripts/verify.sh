@@ -45,6 +45,7 @@ for ctx in k3d-sgp-dev k3d-sgp-homolog k3d-sgp-prod; do
   check_required "cert-manager namespace: ${ctx}" kubectl --context "$ctx" get ns cert-manager
   check_required "trivy-operator namespace: ${ctx}" kubectl --context "$ctx" get ns trivy-system
   check_required "kyverno namespace: ${ctx}" kubectl --context "$ctx" get ns kyverno
+  check_required "prometheus service: ${ctx}" kubectl --context "$ctx" -n observability get svc kube-prometheus-stack-prometheus
   check_required "step cluster issuer ready: ${ctx}" check_step_issuer_ready "$ctx"
 done
 
@@ -65,7 +66,7 @@ else
 fi
 
 if command -v conftest >/dev/null 2>&1; then
-  check_optional "conftest policy checks" conftest test "${ROOT_DIR}/gitops/apps/workloads/podinfo/base"
+  check_optional "conftest policy checks" conftest test "${ROOT_DIR}/gitops/apps/workloads" --policy "${ROOT_DIR}/policies/conftest"
 fi
 
 if (( failures > 0 )); then

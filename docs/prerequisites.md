@@ -87,6 +87,18 @@ make doctor PROFILE=light
 make versions
 ```
 
+## Ordem recomendada para segredos e PKI
+
+Após `make up` e `make reconcile`, use esta sequência para evitar drift de PKI:
+
+```bash
+make vault-bootstrap
+make stepca-bootstrap
+make vault-configure
+./scripts/render-step-issuer-values.sh
+make reconcile PROFILE=light
+```
+
 ## Portas locais utilizadas
 
 - Registry local: `localhost:5001`

@@ -15,24 +15,15 @@ Este guia produz evidências auditáveis para três cenários:
 2. Ferramentas no host: `yq`, `kubectl`, `cosign`, `syft`, `grype`, `trivy`, `gh`.
 3. Plugin de Rollouts disponível (necessário para comandos `kubectl argo rollouts`):
    - `kubectl argo rollouts version`
-4. Chave pública do Cosign renderizada nos manifests (necessário para `verifyImages` em cluster):
+4. Chave pública do Cosign renderizada nos manifests:
 
 ```bash
-# valide acesso ao GitHub e a chave pública a ser usada no verify
 gh auth status
 ./scripts/render-cosign-public-key.sh /caminho/para/cosign.pub
 make reconcile PROFILE=light
 ```
 
-Se você tiver apenas a chave privada, gere a pública antes:
-
-```bash
-cosign public-key --key /caminho/para/cosign.key > /tmp/cosign.pub
-./scripts/render-cosign-public-key.sh /tmp/cosign.pub
-make reconcile PROFILE=light
-```
-
-5. `IMAGE_REF` de um release assinado e atestado (necessário para cenário A):
+5. `IMAGE_REF` de um release assinado e atestado:
 
 ```bash
 RUN_ID="$(gh run list --workflow release.yml --limit 20 --json databaseId,conclusion -R gabrielldn/secure-gitops-platform -q '[.[] | select(.conclusion=="success")][0].databaseId')"
@@ -46,15 +37,15 @@ export IMAGE_REF="$(cat .tmp/release-artifacts/image-ref.txt)"
 echo "IMAGE_REF=${IMAGE_REF}"
 ```
 
-Esse bloco usa os artifacts do GitHub Actions para evitar digests incorretos e garantir reprodutibilidade.
-
 ## Cenário A: deploy aprovado
 
-1. Atualize a imagem de `homolog` e `prod` para o digest assinado:
+1. Atualize apenas o `demo-app` em `homolog` e `prod`:
 
 ```bash
-yq -i '(.spec.template.spec.containers[] | select(.name=="podinfo") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/podinfo/overlays/homolog/rollout-patch.yaml
-yq -i '(.spec.template.spec.containers[] | select(.name=="podinfo") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/podinfo/overlays/prod/rollout-patch.yaml
+yq -i '.spec.replicas = 2' gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml
+yq -i '.spec.replicas = 2' gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
+yq -i '(.spec.template.spec.containers[] | select(.name=="app") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml
+yq -i '(.spec.template.spec.containers[] | select(.name=="app") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
 ```
 
 2. Reconcile:
@@ -63,17 +54,19 @@ yq -i '(.spec.template.spec.containers[] | select(.name=="podinfo") | .image) = 
 make reconcile PROFILE=light
 ```
 
-3. Confirme rollout saudável:
+3. Confirme o deploy saudável:
 
 ```bash
-kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout podinfo
-kubectl --context k3d-sgp-prod -n apps argo rollouts get rollout podinfo
+kubectl --context k3d-sgp-homolog -n apps get deploy secure-gitops-demo-app
+kubectl --context k3d-sgp-prod -n apps get deploy secure-gitops-demo-app
+kubectl --context k3d-sgp-homolog -n apps get events --sort-by=.lastTimestamp | tail -n 20
+kubectl --context k3d-sgp-prod -n apps get events --sort-by=.lastTimestamp | tail -n 20
 ```
 
 Resultado esperado:
 
-- `STATUS: Healthy` no rollout.
-- Sem erro de admission nos eventos do namespace `apps`.
+- Deployment `secure-gitops-demo-app` disponível nos dois ambientes.
+- Sem erro de admission do Kyverno para essa versão assinada/atestada.
 
 4. Gere evidência do supply chain:
 
@@ -81,38 +74,33 @@ Resultado esperado:
 make evidence IMAGE_REF="${IMAGE_REF}"
 ```
 
-Resultado esperado:
-
-- Pacote em `artifacts/evidence/<UTC-YYYYMMDDTHHMMSSZ>/`.
-- `summary.md` com `PASS` para `cosign verify`, attestations, SBOM e scans.
-
 ## Cenário B: bloqueio de assinatura/attestation
 
-1. Aplique um Pod com digest inválido, no mesmo padrão de imagem, em `homolog` e `prod`:
+1. Aplique um Pod com digest inválido em `homolog` e `prod`:
 
 ```bash
-cat <<'EOF' >/tmp/podinfo-deny.yaml
+cat <<'EOF2' >/tmp/demo-app-deny.yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: podinfo-deny-test
+  name: demo-app-deny-test
   namespace: apps
 spec:
   containers:
-    - name: podinfo
+    - name: app
       image: ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:1111111111111111111111111111111111111111111111111111111111111111
-EOF
+EOF2
 
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" apply -f /tmp/podinfo-deny.yaml || true
+  kubectl --context "${ctx}" apply -f /tmp/demo-app-deny.yaml || true
 done
 ```
 
-2. Colete a evidência do deny:
+2. Colete evidência do deny:
 
 ```bash
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" -n apps describe pod podinfo-deny-test || true
+  kubectl --context "${ctx}" -n apps describe pod demo-app-deny-test || true
   kubectl --context "${ctx}" -n apps get policyreport -o yaml > "/tmp/policyreport-${ctx}.yaml"
   kubectl --context "${ctx}" get clusterpolicyreport -o yaml > "/tmp/clusterpolicyreport-${ctx}.yaml"
 done
@@ -120,8 +108,8 @@ done
 
 Resultado esperado:
 
-- `kubectl apply` falha com mensagem de deny do Kyverno (`verify-image-signatures` ou `verify-image-attestations`) em `homolog` e `prod`.
-- `policyreport`/`clusterpolicyreport` registra resultado de violação em ambos os ambientes.
+- `kubectl apply` falha com deny do Kyverno (`verify-image-signatures` ou `verify-image-attestations`).
+- `policyreport`/`clusterpolicyreport` registram violação em ambos os ambientes.
 
 ## Cenário C: falha de canary e rollback automático
 
@@ -151,7 +139,7 @@ kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout podinfo
 Resultado esperado:
 
 - AnalysisRun com falha.
-- Rollout entra em `Degraded` e aborta progressão canary (rollback automático para a revisão estável).
+- Rollout entra em `Degraded` e aborta progressão canary.
 
 ## Limpeza e reversão
 
@@ -159,17 +147,17 @@ Resultado esperado:
 
 ```bash
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" -n apps delete pod podinfo-deny-test --ignore-not-found
+  kubectl --context "${ctx}" -n apps delete pod demo-app-deny-test --ignore-not-found
 done
 ```
 
-2. Restaure manifests alterados localmente (cenário A):
+2. Restaure manifests alterados localmente no cenário A:
 
 ```bash
-git restore gitops/apps/workloads/podinfo/overlays/homolog/rollout-patch.yaml gitops/apps/workloads/podinfo/overlays/prod/rollout-patch.yaml
+git restore gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
 ```
 
-3. Restaure o estado GitOps dos clusters (inclui AnalysisTemplate do cenário C):
+3. Restaure o estado GitOps dos clusters:
 
 ```bash
 make reconcile PROFILE=light

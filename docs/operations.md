@@ -79,8 +79,8 @@ make reconcile PROFILE=light \
 
 ```bash
 make vault-bootstrap
-make vault-configure
 make stepca-bootstrap
+make vault-configure
 ./scripts/render-step-issuer-values.sh
 make reconcile PROFILE=light
 ```
@@ -89,7 +89,8 @@ Notas importantes:
 
 - `vault-bootstrap` é idempotente no fluxo local: se o Vault atual não estiver inicializado e já existir `.secrets/vault/init.enc.json`, o arquivo antigo é arquivado em `.secrets/vault/archive/` e um novo bootstrap é criado.
 - `stepca-bootstrap` salva material cifrado em `.secrets/step-ca/bootstrap.enc.json`.
-- `render-step-issuer-values.sh` materializa `kid`, `caBundle` e `password` nos manifests de issuer.
+- `vault-configure` publica `provisioner_password` em `kv/apps/pki/step-issuer` para consumo via ESO.
+- `render-step-issuer-values.sh` materializa `kid`, `caBundle` e `url` nos manifests do `StepClusterIssuer`.
 
 ### 5) Verificação
 
@@ -102,6 +103,7 @@ make verify PROFILE=light
 
 - Reachability dos 3 clusters
 - Namespaces críticos
+- Service `kube-prometheus-stack-prometheus` nos 3 clusters
 - `StepClusterIssuer` pronto nos 3 ambientes
 - Argo CD no hub
 - Vault/Step namespaces

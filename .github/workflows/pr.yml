@@ -56,9 +56,8 @@ jobs:
       - name: Run Kyverno tests
         run: kyverno test policies/tests/kyverno
 
-      - name: Run Conftest optional checks
-        continue-on-error: true
-        run: conftest test policies/tests/kyverno/resources --policy policies/conftest
+      - name: Run Conftest manifest hygiene checks
+        run: conftest test gitops/apps/workloads --policy policies/conftest
 
       - name: Trivy config scan
         run: trivy config --exit-code 1 --severity HIGH,CRITICAL --skip-dirs policies/tests --skip-dirs supply-chain/demo-app .

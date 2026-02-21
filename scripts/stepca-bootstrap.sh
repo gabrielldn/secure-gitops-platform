@@ -84,4 +84,4 @@ rm -f "$bootstrap_plain"
 
 log "step-ca root CA saved at ${root_cert_file}"
 log "encrypted step-ca bootstrap saved at ${bootstrap_enc}"
-log "next: ./scripts/render-step-issuer-values.sh"
+log "next: make vault-configure && ./scripts/render-step-issuer-values.sh"

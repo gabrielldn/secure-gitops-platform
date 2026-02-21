@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: secure-gitops-demo-app
+spec:
+  replicas: 0
+  template:
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:1111111111111111111111111111111111111111111111111111111111111111

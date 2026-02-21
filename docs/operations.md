@@ -29,6 +29,21 @@ Cria:
 - Clusters `sgp-dev`, `sgp-homolog`, `sgp-prod`
 - Kubeconfig local em `.kube/config`
 
+Parâmetros úteis para ambientes com CPU limitada/instável:
+
+```bash
+K3D_CREATE_RETRIES=3 \
+K3D_CREATE_TIMEOUT=420s \
+K3D_RETRY_BASE_DELAY_SECONDS=20 \
+make up PROFILE=light
+```
+
+Comportamento de retry:
+
+- Retry automático para erros transitórios conhecidos do `k3d` (ex.: `context deadline exceeded` no agent join).
+- Limpeza automática entre tentativas (cluster parcial + rede órfã).
+- Fail-fast para erros não transitórios.
+
 ### 3) Bootstrap GitOps
 
 ```bash

@@ -4,7 +4,7 @@
 ![WSL Ubuntu 24.04](https://img.shields.io/badge/WSL-Ubuntu%2024.04-E95420?logo=ubuntu&logoColor=white)
 ![k3d 3 clusters](https://img.shields.io/badge/k3d-3%20clusters-326CE5?logo=kubernetes&logoColor=white)
 ![Kubernetes v1.31.5](https://img.shields.io/badge/Kubernetes-v1.31.5-326CE5?logo=kubernetes&logoColor=white)
-![PR Policy](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/pr.yml?branch=main&label=PR%20Policy)
+![PR Policy](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/pr.yml?label=PR%20Policy)
 ![Release Supply Chain](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/release.yml?label=Release%20Supply%20Chain)
 
 Plataforma Kubernetes local `production-like` para laboratório DevSecOps em WSL, com `k3d` + 3 clusters (`sgp-dev`, `sgp-homolog`, `sgp-prod`), GitOps central, políticas de segurança, supply chain, PKI, gestão de segredos, rollout progressivo e observabilidade.

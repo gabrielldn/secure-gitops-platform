@@ -5,6 +5,20 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner target (default uses GitHub-hosted runner)
+        required: false
+        default: github-hosted
+        type: choice
+        options:
+          - github-hosted
+          - self-hosted
+      enable_local_sync:
+        description: Sync image to localhost:5001 (only relevant for self-hosted)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -14,13 +28,61 @@ permissions:
 
 jobs:
   build-sign-attest:
-    runs-on: [self-hosted, Linux]
+    runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/secure-gitops-demo-app
-      ENABLE_LOCAL_SYNC: "true"
+      ENABLE_LOCAL_SYNC: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_local_sync && 'true' || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Ensure Linux runner
+        if: runner.os != 'Linux'
+        run: |
+          echo "This workflow requires a Linux runner. Current runner OS: ${RUNNER_OS}"
+          exit 1
+
+      - name: Install toolchain
+        run: |
+          set -euo pipefail
+          BIN_DIR="${RUNNER_TEMP}/bin"
+          mkdir -p "${BIN_DIR}"
+          echo "${BIN_DIR}" >> "$GITHUB_PATH"
+
+          CRANE_VERSION=v0.20.3
+          curl -fsSL -o "${RUNNER_TEMP}/go-containerregistry.tgz" \
+            "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/go-containerregistry.tgz" -C "${BIN_DIR}" crane
+
+          SYFT_VERSION=v1.13.0
+          curl -fsSL -o "${RUNNER_TEMP}/syft.tgz" \
+            "https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_linux_amd64.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/syft.tgz" -C "${BIN_DIR}" syft
+
+          GRYPE_VERSION=v0.83.0
+          curl -fsSL -o "${RUNNER_TEMP}/grype.tgz" \
+            "https://github.com/anchore/grype/releases/download/${GRYPE_VERSION}/grype_${GRYPE_VERSION#v}_linux_amd64.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/grype.tgz" -C "${BIN_DIR}" grype
+
+          TRIVY_VERSION=v0.56.2
+          curl -fsSL -o "${RUNNER_TEMP}/trivy.tgz" \
+            "https://github.com/aquasecurity/trivy/releases/download/${TRIVY_VERSION}/trivy_${TRIVY_VERSION#v}_Linux-64bit.tar.gz"
+          tar -xzf "${RUNNER_TEMP}/trivy.tgz" -C "${BIN_DIR}" trivy
+
+          COSIGN_VERSION=v2.4.1
+          curl -fsSL -o "${BIN_DIR}/cosign" \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+          chmod +x "${BIN_DIR}/cosign"
+
+      - name: Verify required tools
+        run: |
+          set -euo pipefail
+          for tool in docker crane syft grype trivy cosign jq; do
+            if ! command -v "$tool" >/dev/null 2>&1; then
+              echo "required tool not found: $tool"
+              exit 1
+            fi
+          done
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
@@ -49,13 +111,17 @@ jobs:
       - name: Prepare signing key
         run: |
           set -euo pipefail
-          if [[ -n "${VAULT_ADDR:-}" && -n "${VAULT_TOKEN:-}" ]]; then
+          if [[ -n "${COSIGN_PRIVATE_KEY:-}" ]]; then
+            printf '%s\n' "$COSIGN_PRIVATE_KEY" > cosign.key
+          elif [[ -n "${VAULT_ADDR:-}" && -n "${VAULT_TOKEN:-}" ]]; then
+            if ! command -v vault >/dev/null 2>&1; then
+              echo "vault CLI not found and COSIGN_PRIVATE_KEY not provided"
+              exit 1
+            fi
             vault login "$VAULT_TOKEN" >/dev/null
             vault kv get -field=private_key kv/cicd/cosign > cosign.key
-          elif [[ -n "${COSIGN_PRIVATE_KEY:-}" ]]; then
-            printf '%s\n' "$COSIGN_PRIVATE_KEY" > cosign.key
           else
-            echo "No cosign key source found (Vault or COSIGN_PRIVATE_KEY)."
+            echo "No cosign key source found (COSIGN_PRIVATE_KEY or Vault credentials)."
             exit 1
           fi
           chmod 600 cosign.key
@@ -100,6 +166,8 @@ jobs:
         run: |
           if [[ "${ENABLE_LOCAL_SYNC}" == "true" ]]; then
             ./scripts/sync-image-to-local-registry.sh "${{ steps.image.outputs.image_ref }}" localhost:5001
+          else
+            echo "Skipping local registry sync (ENABLE_LOCAL_SYNC=${ENABLE_LOCAL_SYNC})."
           fi
 
       - name: Upload artifacts

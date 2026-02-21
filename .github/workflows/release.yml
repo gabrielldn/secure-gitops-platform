@@ -165,9 +165,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "${SIGNING_MODE}" == "key" ]]; then
-            cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+            cosign attest --yes --tlog-upload=false --key cosign.key --predicate provenance.json --type https://slsa.dev/provenance/v1 "${{ steps.image.outputs.image_ref }}"
           else
-            cosign attest --yes --predicate provenance.json --type slsaprovenance "${{ steps.image.outputs.image_ref }}"
+            cosign attest --yes --predicate provenance.json --type https://slsa.dev/provenance/v1 "${{ steps.image.outputs.image_ref }}"
           fi
 
       - name: Export image metadata
@@ -183,7 +183,7 @@ jobs:
             cosign public-key --key cosign.key > cosign.pub
             cosign verify --key cosign.pub "${{ steps.image.outputs.image_ref }}" > cosign-verify-signature.txt
             cosign verify-attestation --key cosign.pub --type spdx "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-spdx.txt
-            cosign verify-attestation --key cosign.pub --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+            cosign verify-attestation --key cosign.pub --type https://slsa.dev/provenance/v1 "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
           else
             printf '%s\n' "KEYLESS (OIDC)" > cosign.pub
             IDENTITY_REGEX="^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*$"
@@ -199,7 +199,7 @@ jobs:
             cosign verify-attestation \
               --certificate-oidc-issuer "${ISSUER}" \
               --certificate-identity-regexp "${IDENTITY_REGEX}" \
-              --type slsaprovenance "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
+              --type https://slsa.dev/provenance/v1 "${{ steps.image.outputs.image_ref }}" > cosign-verify-attestation-slsa.txt
           fi
 
       - name: Optional local registry sync

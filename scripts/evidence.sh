@@ -96,6 +96,10 @@ if [[ ! -s "$KEY_COPY_FILE" ]]; then
   die "resolved cosign key is empty: $KEY_COPY_FILE"
 fi
 
+if [[ -z "$KEY_FILE" ]] && grep -q "REPLACE_WITH_COSIGN_PUBLIC_KEY" "$KEY_COPY_FILE"; then
+  die "cosign public key manifest is not rendered. Run ./scripts/render-cosign-public-key.sh <cosign-public-key-file> or set COSIGN_PUBLIC_KEY_FILE=<cosign.pub>"
+fi
+
 printf '%s\n' "$IMAGE_REF" > "${EVIDENCE_DIR}/metadata/image-ref.txt"
 
 collect_tool_versions() {

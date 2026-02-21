@@ -12,16 +12,47 @@ Este guia produz evidências auditáveis para três cenários:
    - `make up PROFILE=light`
    - `make reconcile PROFILE=light`
    - `make verify PROFILE=light`
-2. Ferramentas no host: `yq`, `kubectl`, `cosign`, `syft`, `grype`, `trivy`.
-3. Digest assinado do release:
-   - `IMAGE_REF="ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest-valido>"`
+2. Ferramentas no host: `yq`, `kubectl`, `cosign`, `syft`, `grype`, `trivy`, `gh`.
+3. Plugin de Rollouts disponível (necessário para comandos `kubectl argo rollouts`):
+   - `kubectl argo rollouts version`
+4. Chave pública do Cosign renderizada nos manifests (necessário para `verifyImages` em cluster):
+
+```bash
+# valide acesso ao GitHub e a chave pública a ser usada no verify
+gh auth status
+./scripts/render-cosign-public-key.sh /caminho/para/cosign.pub
+make reconcile PROFILE=light
+```
+
+Se você tiver apenas a chave privada, gere a pública antes:
+
+```bash
+cosign public-key --key /caminho/para/cosign.key > /tmp/cosign.pub
+./scripts/render-cosign-public-key.sh /tmp/cosign.pub
+make reconcile PROFILE=light
+```
+
+5. `IMAGE_REF` de um release assinado e atestado (necessário para cenário A):
+
+```bash
+RUN_ID="$(gh run list --workflow release.yml --limit 20 --json databaseId,conclusion -R gabrielldn/secure-gitops-platform -q '[.[] | select(.conclusion=="success")][0].databaseId')"
+if [[ -z "${RUN_ID}" ]]; then
+  echo "Nenhum run de release com sucesso. Execute o workflow release.yml e tente novamente."
+  exit 1
+fi
+mkdir -p .tmp/release-artifacts
+gh run download "${RUN_ID}" -n supply-chain-artifacts -D .tmp/release-artifacts -R gabrielldn/secure-gitops-platform
+export IMAGE_REF="$(cat .tmp/release-artifacts/image-ref.txt)"
+echo "IMAGE_REF=${IMAGE_REF}"
+```
+
+Esse bloco usa os artifacts do GitHub Actions para evitar digests incorretos e garantir reprodutibilidade.
 
 ## Cenário A: deploy aprovado
 
 1. Atualize a imagem de `homolog` e `prod` para o digest assinado:
 
 ```bash
-export IMAGE_REF="ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest-valido>"
 yq -i '(.spec.template.spec.containers[] | select(.name=="podinfo") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/podinfo/overlays/homolog/rollout-patch.yaml
 yq -i '(.spec.template.spec.containers[] | select(.name=="podinfo") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/podinfo/overlays/prod/rollout-patch.yaml
 ```

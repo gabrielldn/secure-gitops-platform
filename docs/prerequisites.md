@@ -50,6 +50,7 @@ Validadas por `make doctor`:
 - `docker`, `ansible`, `k3d`, `kubectl`, `helm`, `jq`, `yq`
 - `trivy`, `syft`, `grype`, `cosign`, `conftest`, `kyverno`
 - `sops`, `age`, `step`, `vault`, `rsync`
+- `gh` (recomendado para extrair `IMAGE_REF` dos artifacts do release)
 
 Para instalar automaticamente (incluindo `make`):
 
@@ -58,6 +59,26 @@ make bootstrap
 ```
 
 Quando o comando pedir `BECOME password:`, use a senha do seu usuário no `sudo` do WSL.
+
+## Ferramenta adicional para demo de canary
+
+Os comandos de demo e alguns runbooks usam `kubectl argo rollouts ...`.
+
+Verificação:
+
+```bash
+kubectl argo rollouts version
+```
+
+Se o comando falhar com `unknown command "argo" for "kubectl"`, instale o plugin:
+
+```bash
+ROLLOUTS_VERSION="$(curl -fsSL https://api.github.com/repos/argoproj/argo-rollouts/releases/latest | jq -r .tag_name)"
+curl -fsSL -o /tmp/kubectl-argo-rollouts "https://github.com/argoproj/argo-rollouts/releases/download/${ROLLOUTS_VERSION}/kubectl-argo-rollouts-linux-amd64"
+chmod +x /tmp/kubectl-argo-rollouts
+sudo mv /tmp/kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+kubectl argo rollouts version --short
+```
 
 ## Verificação inicial
 

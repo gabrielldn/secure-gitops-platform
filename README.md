@@ -120,8 +120,20 @@ make down
 8. Gerar evidências do supply chain:
 
 ```bash
-make evidence IMAGE_REF=ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest>
+./scripts/render-cosign-public-key.sh /caminho/para/cosign.pub
+make reconcile PROFILE=light
+gh auth status
+RUN_ID="$(gh run list --workflow release.yml --limit 20 --json databaseId,conclusion -R gabrielldn/secure-gitops-platform -q '[.[] | select(.conclusion=="success")][0].databaseId')"
+if [[ -z "${RUN_ID}" ]]; then
+  echo "Nenhum run de release com sucesso. Execute release.yml e tente novamente."
+  exit 1
+fi
+gh run download "${RUN_ID}" -n supply-chain-artifacts -D .tmp/release-artifacts -R gabrielldn/secure-gitops-platform
+export IMAGE_REF="$(cat .tmp/release-artifacts/image-ref.txt)"
+make evidence IMAGE_REF="${IMAGE_REF}"
 ```
+
+Esse fluxo evita erro de digest incorreto e garante que `cosign verify` use a chave esperada.
 
 ## Comandos `make`
 
@@ -138,6 +150,7 @@ make evidence IMAGE_REF=ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest
 - `make verify-quick`: health-check essencial.
 - `make verify`: verificação E2E (inclui issuer pronto em todos os clusters).
 - `make evidence`: pacote de evidência (cosign verify, attestations, SBOM, scans, policy reports).
+  - Pré-condições: chave Cosign renderizada + `IMAGE_REF` vindo de run bem-sucedido do `release.yml`.
 - `make sanitize-check`: auditoria não-destrutiva para publicação pública sanitizada.
 - `make down`: remove clusters e registry local.
 - `make clean`: limpeza local previsível.

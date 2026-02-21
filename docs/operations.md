@@ -125,14 +125,39 @@ make policy-test
 
 - Gerar pacote de evidência (SBOM, scan, verify e policy reports):
 
+Antes de executar `make evidence`, garanta dois insumos:
+
+1. Chave pública do Cosign (para validar assinatura/attestation):
+
 ```bash
-make evidence IMAGE_REF=ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:<digest>
+gh auth status
+./scripts/render-cosign-public-key.sh /caminho/para/cosign.pub
+make reconcile PROFILE=light
+```
+
+2. `IMAGE_REF` de um release bem-sucedido (para não usar digest inválido):
+
+```bash
+RUN_ID="$(gh run list --workflow release.yml --limit 20 --json databaseId,conclusion -R gabrielldn/secure-gitops-platform -q '[.[] | select(.conclusion=="success")][0].databaseId')"
+if [[ -z "${RUN_ID}" ]]; then
+  echo "Nenhum run de release com sucesso. Execute release.yml e tente novamente."
+  exit 1
+fi
+mkdir -p .tmp/release-artifacts
+gh run download "${RUN_ID}" -n supply-chain-artifacts -D .tmp/release-artifacts -R gabrielldn/secure-gitops-platform
+export IMAGE_REF="$(cat .tmp/release-artifacts/image-ref.txt)"
+```
+
+Com os insumos prontos:
+
+```bash
+make evidence IMAGE_REF="${IMAGE_REF}"
 ```
 
 Comportamento:
 
 - Saída padrão em `artifacts/evidence/<UTC-YYYYMMDDTHHMMSSZ>/`.
-- Use `COSIGN_PUBLIC_KEY_FILE=<arquivo>` para chave explícita.
+- Use `COSIGN_PUBLIC_KEY_FILE=<arquivo>` para chave explícita (quando não quiser usar o manifest renderizado no repo).
 - Use `EVIDENCE_DIR=<diretorio>` para saída customizada.
 - Use `EVIDENCE_INCLUDE_CLUSTER=false` para pular export de policy reports.
 

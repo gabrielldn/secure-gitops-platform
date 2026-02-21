@@ -59,3 +59,11 @@ Também usa `GITHUB_TOKEN` para push no GHCR.
 
 - Dispare manualmente `pr-security-and-policy` (`workflow_dispatch`) para validar toolchain de validação.
 - Dispare `local-registry-sync` com um digest válido para validar conectividade com `localhost:5001`.
+
+## Artefatos úteis do release
+
+Após um run bem-sucedido de `release.yml`, o artifact `supply-chain-artifacts` inclui:
+
+- `image-ref.txt` e `image-digest.txt` (insumo para `make evidence` e promoção por digest).
+- `sbom.spdx.json`, `grype.json`, `trivy.json`.
+- `cosign-verify-signature.txt`, `cosign-verify-attestation-spdx.txt`, `cosign-verify-attestation-slsa.txt`.

@@ -7,4 +7,4 @@
 - `vault-sealed.md`
 - `step-issuer-connectivity.md`
 - `registry-sync-failed.md`
-- `falco-unavailable-wsl.md`
+- `falco-unavailable-wsl.md` (WSL/kernels sem suporte eBPF)

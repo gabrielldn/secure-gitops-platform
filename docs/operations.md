@@ -15,7 +15,7 @@ Se faltar toolchain:
 make bootstrap
 ```
 
-No `make bootstrap`, o prompt `BECOME password:` pede a senha de `sudo` do usuário atual no WSL.
+No `make bootstrap`, o prompt `BECOME password:` pede a senha de `sudo` do usuário Linux atual (nativo ou WSL).
 
 ### 2) Provisionamento local
 
@@ -107,7 +107,7 @@ make verify PROFILE=light
 - `StepClusterIssuer` pronto nos 3 ambientes
 - Argo CD no hub
 - Vault/Step namespaces
-- Falco condicional em WSL
+- Falco condicional quando o kernel não fornece suporte completo
 - Testes de policy (`kyverno test`)
 
 ## Operações auxiliares
@@ -194,5 +194,5 @@ make clean
 - Policy deny: `runbooks/policy-deny.md`
 - Vault sealed: `runbooks/vault-sealed.md`
 - Step-issuer conectividade: `runbooks/step-issuer-connectivity.md`
-- Falco indisponível em WSL: `runbooks/falco-unavailable-wsl.md`
+- Falco indisponível (WSL/kernels sem suporte): `runbooks/falco-unavailable-wsl.md`
 - Falha de sync do registry: `runbooks/registry-sync-failed.md`

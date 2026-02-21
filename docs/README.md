@@ -4,7 +4,7 @@ Este diretório contém os guias operacionais e arquiteturais do projeto.
 
 ## Índice
 
-- `prerequisites.md`: requisitos de host, WSL e ferramentas.
+- `prerequisites.md`: requisitos de host Linux (nativo ou WSL) e ferramentas.
 - `architecture.md`: topologia hub-and-spoke, fluxos e decisões principais.
 - `operations.md`: operação de ponta a ponta com `make`.
 - `demo.md`: cenários reproduzíveis de evidência (deploy ok, policy deny, rollback canary).

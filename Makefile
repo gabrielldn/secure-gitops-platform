@@ -45,7 +45,7 @@ versions:
 	@./scripts/print-versions.sh
 
 bootstrap:
-	@echo "[INFO] When prompted with 'BECOME password:', use your WSL sudo password."
+	@echo "[INFO] When prompted with 'BECOME password:', use your current Linux sudo password (native or WSL)."
 	@$(ANSIBLE_PLAYBOOK) \
 		-i "$(ANSIBLE_INVENTORY)" \
 		"$(ROOT_DIR)/ansible/playbooks/bootstrap.yml" \

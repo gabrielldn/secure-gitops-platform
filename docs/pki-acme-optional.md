@@ -19,7 +19,7 @@ Use ACME somente se você precisar:
 
 - Step-CA do hub acessível em HTTPS estável.
 - Roteamento de challenge definido no ingress.
-- Confiança da CA local instalada no host (WSL/Windows), quando aplicável.
+- Confiança da CA local instalada no host Linux (nativo ou WSL), quando aplicável.
 
 ## Exemplo de `ClusterIssuer` ACME (referência)
 

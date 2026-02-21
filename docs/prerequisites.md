@@ -2,8 +2,9 @@
 
 ## Ambiente alvo
 
-- WSL2 com Ubuntu 24.04.
-- Docker Engine funcional no WSL.
+- Ubuntu 24.04 LTS nativo (suportado e recomendado).
+- WSL2 com Ubuntu 24.04 LTS (também suportado).
+- Docker Engine funcional no host Linux.
 - Ansible disponível.
 - Acesso à internet para baixar charts/imagens.
 
@@ -20,7 +21,7 @@ Perfis definidos em `platform/profiles/`:
   - Memória mínima: 16 GB
   - Disco mínimo: 50 GB
 
-## Configuração recomendada do WSL (`full`)
+## Configuração opcional para WSL (`full`)
 
 Crie `%UserProfile%\\.wslconfig` no Windows:
 
@@ -58,7 +59,7 @@ Para instalar automaticamente (incluindo `make`):
 make bootstrap
 ```
 
-Quando o comando pedir `BECOME password:`, use a senha do seu usuário no `sudo` do WSL.
+Quando o comando pedir `BECOME password:`, use a senha de `sudo` do seu usuário Linux atual (nativo ou WSL).
 
 ## Ferramenta adicional para demo de canary
 
@@ -124,12 +125,12 @@ Após bootstrap, reinicie o shell/sessão:
 newgrp docker
 ```
 
-## Observação sobre Falco no WSL
+## Observação sobre Falco (WSL e kernels Linux)
 
-Falco depende de suporte de kernel/eBPF e em WSL pode não funcionar.
+Falco depende de suporte de kernel/eBPF. Em WSL, ou em kernels Linux com suporte incompleto, ele pode não funcionar.
 
 Contrato do projeto:
 
 - Falco: `best-effort`.
 - Fallback obrigatório: Kyverno + Trivy Operator + auditoria/alertas.
-- `make verify` trata Falco como condicional em WSL.
+- `make verify` trata Falco como condicional quando o host não oferece suporte completo.

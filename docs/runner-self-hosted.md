@@ -1,10 +1,11 @@
-# Runner Self-Hosted (WSL)
+# Runner Self-Hosted (Linux/WSL)
 
-Este projeto usa runner self-hosted para jobs de release que dependem do ambiente local (Docker, Vault e sync de registry).
+Este projeto suporta runner self-hosted Linux (Ubuntu nativo ou WSL) para fluxos que dependem de ambiente local.
+O `release.yml` também possui fallback para runner GitHub-hosted (`ubuntu-latest`) quando o self-hosted não estiver disponível.
 
 ## Workflows que usam runner self-hosted
 
-- `.github/workflows/release.yml`
+- `.github/workflows/release.yml` (opcional via `workflow_dispatch` com `runner=self-hosted`)
 - `.github/workflows/local-registry-sync.yml`
 
 ## Labels mínimas
@@ -26,13 +27,13 @@ Você pode preparar o ambiente com:
 make bootstrap
 ```
 
-Se aparecer `BECOME password:`, informe a senha de `sudo` do WSL.
+Se aparecer `BECOME password:`, informe a senha de `sudo` do usuário Linux atual.
 
 ## Registro do runner (resumo)
 
 1. No GitHub do repositório: `Settings -> Actions -> Runners -> New self-hosted runner`.
 2. Escolha `Linux x64`.
-3. Execute os comandos de registro no WSL.
+3. Execute os comandos de registro no host Linux (nativo ou WSL).
 4. Instale como serviço para operação contínua.
 
 ## Segredos e variáveis para release
@@ -46,6 +47,8 @@ O workflow `release.yml` aceita:
   - `COSIGN_PRIVATE_KEY`
 
 Também usa `GITHUB_TOKEN` para push no GHCR.
+
+Se nenhuma chave for fornecida, o `release.yml` usa assinatura keyless com OIDC do GitHub.
 
 ## Hardening recomendado
 

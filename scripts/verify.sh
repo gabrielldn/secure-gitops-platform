@@ -54,7 +54,7 @@ check_required "vault namespace on dev" kubectl --context k3d-sgp-dev get ns vau
 check_required "step namespace on dev" kubectl --context k3d-sgp-dev get ns step-ca
 
 if "${ROOT_DIR}/scripts/falco-check.sh" | grep -q "best-effort"; then
-  check_optional "falco running (best effort on WSL)" kubectl --context k3d-sgp-dev -n falco get ds falco
+  check_optional "falco running (best effort when kernel support is limited)" kubectl --context k3d-sgp-dev -n falco get ds falco
 else
   check_required "falco running" kubectl --context k3d-sgp-dev -n falco get ds falco
 fi

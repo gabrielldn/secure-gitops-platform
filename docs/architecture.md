@@ -35,7 +35,7 @@ flowchart LR
 - Políticas: Kyverno (baseline + supply chain).
 - Segredos: Vault (hub) + External Secrets nos 3 clusters.
 - PKI: Step-CA (hub) + cert-manager + step-issuer nos 3 clusters.
-- Segurança runtime: Trivy Operator obrigatório, Falco opcional em WSL.
+- Segurança runtime: Trivy Operator obrigatório, Falco opcional quando o kernel não suporta todos os recursos necessários.
 - Observabilidade: Prometheus/Loki/Tempo/Grafana + OTel Collector.
   - `dev`: stack completa (Prometheus, Loki, Tempo, OTel).
   - `homolog` e `prod`: Prometheus + OTel para análise de rollout e SLO.
@@ -101,5 +101,5 @@ Pipeline de artefato:
 
 ## Limitações conhecidas de laboratório
 
-- WSL pode limitar o comportamento de Falco.
+- WSL e alguns kernels Linux podem limitar o comportamento de Falco.
 - Em ambiente local, alguns operadores podem apresentar diferenças transitórias de sincronização no Argo CD sem impactar o aceite final; o gate de aceite é `make verify`.

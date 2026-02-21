@@ -1,13 +1,13 @@
 # Secure GitOps Platform
 
 [![Licença MIT](https://img.shields.io/badge/Licen%C3%A7a-MIT-yellow.svg)](LICENSE)
-![WSL Ubuntu 24.04](https://img.shields.io/badge/WSL-Ubuntu%2024.04-E95420?logo=ubuntu&logoColor=white)
+![Linux Ubuntu 24.04+](https://img.shields.io/badge/Linux-Ubuntu%2024.04%2B-E95420?logo=ubuntu&logoColor=white)
 ![k3d 3 clusters](https://img.shields.io/badge/k3d-3%20clusters-326CE5?logo=kubernetes&logoColor=white)
 ![Kubernetes v1.31.5](https://img.shields.io/badge/Kubernetes-v1.31.5-326CE5?logo=kubernetes&logoColor=white)
 ![PR Policy](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/pr.yml?label=PR%20Policy)
 ![Release Supply Chain](https://img.shields.io/github/actions/workflow/status/gabrielldn/secure-gitops-platform/release.yml?label=Release%20Supply%20Chain)
 
-Plataforma Kubernetes local `production-like` para laboratório DevSecOps em WSL, com `k3d` + 3 clusters (`sgp-dev`, `sgp-homolog`, `sgp-prod`), GitOps central, políticas de segurança, supply chain, PKI, gestão de segredos, rollout progressivo e observabilidade.
+Plataforma Kubernetes local `production-like` para laboratório DevSecOps em Linux (Ubuntu 24.04+ nativo ou WSL2), com `k3d` + 3 clusters (`sgp-dev`, `sgp-homolog`, `sgp-prod`), GitOps central, políticas de segurança, supply chain, PKI, gestão de segredos, rollout progressivo e observabilidade.
 
 ## Objetivo do projeto
 
@@ -29,7 +29,7 @@ Entregar um ambiente reproduzível para praticar e demonstrar:
 - Policy-as-code: Kyverno.
 - Segredos: Vault + External Secrets Operator.
 - PKI: cert-manager + Step-CA + step-issuer.
-- Runtime security: Trivy Operator + Falco (best-effort em WSL).
+- Runtime security: Trivy Operator + Falco (best-effort em WSL ou kernels sem suporte eBPF/probe).
 - Observabilidade: kube-prometheus-stack, Loki, Tempo, OpenTelemetry Collector.
 - Supply chain: Syft, Grype, Trivy, Cosign, proveniência estilo SLSA.
 
@@ -74,7 +74,7 @@ make doctor PROFILE=light
 make bootstrap
 ```
 
-Durante esse passo, quando aparecer `BECOME password:`, informe a senha do seu usuário no `sudo` do WSL (não é senha do GitHub, token nem senha de Vault).
+Durante esse passo, quando aparecer `BECOME password:`, informe a senha de `sudo` do seu usuário atual (Linux nativo ou WSL).
 
 3. Subir registry + clusters:
 
@@ -168,7 +168,7 @@ Workflows em `.github/workflows/`:
 - Política de reporte: `SECURITY.md`.
 - Licença: `LICENSE` (MIT).
 - Material sensível de bootstrap fica em `.secrets/` cifrado com `SOPS + age`.
-- `Falco` em WSL é tratado como `best-effort`; fallback obrigatório com Trivy + policies + alertas.
+- `Falco` é tratado como `best-effort` quando o kernel não expõe suporte necessário; fallback obrigatório com Trivy + policies + alertas.
 - Auditoria para publicação pública: `make sanitize-check`.
 
 ## Documentação
@@ -188,6 +188,6 @@ Workflows em `.github/workflows/`:
 ## Observações práticas
 
 - O perfil padrão para convergência local é `light`.
-- O prompt `BECOME password:` no `make bootstrap` corresponde à senha de `sudo` do WSL.
+- O prompt `BECOME password:` no `make bootstrap` corresponde à senha de `sudo` do usuário Linux atual.
 - `make vault-bootstrap` agora é idempotente para ambiente local: se o Vault atual ainda não estiver inicializado e existir `.secrets/vault/init.enc.json` antigo, o arquivo é arquivado em `.secrets/vault/archive/` e um novo bootstrap é gerado.
 - O fluxo recomendado é sempre concluir com `make verify`.

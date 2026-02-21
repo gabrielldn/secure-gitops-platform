@@ -8,6 +8,8 @@ KUBECONFIG_FILE := $(ROOT_DIR)/.kube/config
 REPO_URL ?=
 GITOPS_REVISION ?= main
 ARGO_WAIT_TIMEOUT ?= 1800
+RECONCILE_VERBOSE ?= true
+RECONCILE_POLL_INTERVAL ?= 10
 
 .DEFAULT_GOAL := help
 
@@ -18,7 +20,7 @@ help:
 	@echo "  make bootstrap         - Install local toolchain using Ansible"
 	@echo "  make up                - Create registry + 3 k3d clusters"
 	@echo "  make gitops-bootstrap  - Install ArgoCD + register clusters + appset"
-	@echo "  make reconcile         - GitOps bootstrap and wait for critical sync"
+	@echo "  make reconcile         - GitOps bootstrap and wait for critical sync (RECONCILE_VERBOSE=true RECONCILE_POLL_INTERVAL=5)"
 	@echo "  make vault-bootstrap   - Initialize Vault and encrypt bootstrap material"
 	@echo "  make vault-configure   - Configure Vault auth and policies for ESO"
 	@echo "  make stepca-bootstrap  - Extract and encrypt Step-CA bootstrap material"
@@ -52,7 +54,7 @@ gitops-bootstrap:
 	@KUBECONFIG=$(KUBECONFIG_FILE) REPO_URL="$(REPO_URL)" GITOPS_REVISION="$(GITOPS_REVISION)" ./scripts/gitops-bootstrap.sh
 
 reconcile:
-	@KUBECONFIG=$(KUBECONFIG_FILE) REPO_URL="$(REPO_URL)" GITOPS_REVISION="$(GITOPS_REVISION)" ARGO_WAIT_TIMEOUT="$(ARGO_WAIT_TIMEOUT)" ./scripts/reconcile.sh
+	@KUBECONFIG=$(KUBECONFIG_FILE) REPO_URL="$(REPO_URL)" GITOPS_REVISION="$(GITOPS_REVISION)" ARGO_WAIT_TIMEOUT="$(ARGO_WAIT_TIMEOUT)" RECONCILE_VERBOSE="$(RECONCILE_VERBOSE)" RECONCILE_POLL_INTERVAL="$(RECONCILE_POLL_INTERVAL)" ./scripts/reconcile.sh
 
 vault-bootstrap:
 	@KUBECONFIG=$(KUBECONFIG_FILE) ./scripts/vault-bootstrap.sh

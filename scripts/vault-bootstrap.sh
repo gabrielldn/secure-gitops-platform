@@ -44,9 +44,33 @@ kubectl --context "$CTX" -n "$NS" wait --for=jsonpath='{.status.phase}'=Running 
 
 plain_file="${ROOT_DIR}/.secrets/vault/init.json"
 enc_file="${ROOT_DIR}/.secrets/vault/init.enc.json"
+archive_dir="${ROOT_DIR}/.secrets/vault/archive"
+
+read_vault_status_json() {
+  local status_json
+  set +e
+  status_json="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null)"
+  set -e
+  [[ -n "$status_json" ]] || die "unable to read Vault status from ${NS}/${POD}"
+  echo "$status_json"
+}
+
+vault_status_json="$(read_vault_status_json)"
+vault_initialized="$(echo "$vault_status_json" | jq -r '.initialized // "false"')"
+
+if [[ "$vault_initialized" == "true" ]]; then
+  if [[ -f "$enc_file" ]]; then
+    log "vault already initialized and encrypted init material already exists at ${enc_file}; skipping bootstrap"
+    exit 0
+  fi
+  die "vault is already initialized, but ${enc_file} is missing. Refusing to continue without existing bootstrap material."
+fi
 
 if [[ -f "$enc_file" ]]; then
-  die "encrypted init file already exists: $enc_file"
+  mkdir -p "$archive_dir"
+  backup_file="${archive_dir}/init.$(date -u +%Y%m%dT%H%M%SZ).enc.json"
+  mv "$enc_file" "$backup_file"
+  warn "vault is uninitialized but encrypted init material existed; archived stale file to ${backup_file}"
 fi
 
 kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault operator init -key-shares=1 -key-threshold=1 -format=json > "$plain_file"
@@ -55,6 +79,9 @@ unseal_key="$(jq -r '.unseal_keys_b64[0]' "$plain_file")"
 root_token="$(jq -r '.root_token' "$plain_file")"
 
 kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault operator unseal "$unseal_key" >/dev/null
+
+sealed_state="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
+[[ "$sealed_state" == "false" ]] || die "vault init completed, but ${POD} remains sealed"
 
 sops --encrypt --input-type json --output-type json "$plain_file" > "$enc_file"
 rm -f "$plain_file"

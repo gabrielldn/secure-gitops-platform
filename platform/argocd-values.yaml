@@ -2,8 +2,8 @@ configs:
   params:
     application.instanceLabelKey: argocd.argoproj.io/instance
     server.insecure: "true"
-    controller.status.processors: "10"
-    controller.operation.processors: "5"
+    controller.status.processors: "4"
+    controller.operation.processors: "2"
     reposerver.parallelism.limit: "2"
     controller.repo.server.timeout.seconds: "180"
   cm:
@@ -40,11 +40,11 @@ controller:
     enabled: true
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
+      cpu: 250m
+      memory: 768Mi
     limits:
-      cpu: 700m
-      memory: 1Gi
+      cpu: 1000m
+      memory: 2Gi
 
 repoServer:
   metrics:

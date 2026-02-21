@@ -27,9 +27,11 @@ spec:
                 - Pod
       validate:
         message: hostPath volumes are not allowed.
-        deny:
-          conditions:
-            any:
-              - key: "{{ request.object.spec.volumes[].hostPath || [] | length(@) }}"
-                operator: GreaterThan
-                value: 0
+        foreach:
+          - list: "request.object.spec.volumes || `[]`"
+            deny:
+              conditions:
+                any:
+                  - key: "{{ element.hostPath.path || '' }}"
+                    operator: NotEquals
+                    value: ""

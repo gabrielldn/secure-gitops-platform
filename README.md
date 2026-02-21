@@ -86,6 +86,12 @@ make up PROFILE=light
 make reconcile PROFILE=light
 ```
 
+Verbose já é padrão no `make reconcile`. Para saída reduzida:
+
+```bash
+make reconcile PROFILE=light RECONCILE_VERBOSE=false
+```
+
 5. Material de segredos/PKI:
 
 ```bash
@@ -117,6 +123,7 @@ make down
 - `make up`: sobe registry + 3 clusters k3d.
 - `make gitops-bootstrap`: instala Argo CD e registra clusters.
 - `make reconcile`: bootstrap GitOps + espera de convergência dos apps críticos.
+  - Verbose é padrão; use `RECONCILE_VERBOSE=false` para reduzir logs e `RECONCILE_POLL_INTERVAL=<segundos>` para ajustar intervalo de atualização.
 - `make vault-bootstrap`: inicializa Vault e guarda bootstrap cifrado.
 - `make vault-configure`: configura auth/policies do Vault para ESO.
 - `make stepca-bootstrap`: extrai material de bootstrap do Step-CA para `.secrets` cifrada.
@@ -153,5 +160,5 @@ Workflows em `.github/workflows/`:
 
 - O perfil padrão para convergência local é `light`.
 - O prompt `BECOME password:` no `make bootstrap` corresponde à senha de `sudo` do WSL.
-- `make vault-bootstrap` é operação de bootstrap inicial; se já existir `.secrets/vault/init.enc.json`, o comando falha por proteção (comportamento esperado).
+- `make vault-bootstrap` agora é idempotente para ambiente local: se o Vault atual ainda não estiver inicializado e existir `.secrets/vault/init.enc.json` antigo, o arquivo é arquivado em `.secrets/vault/archive/` e um novo bootstrap é gerado.
 - O fluxo recomendado é sempre concluir com `make verify`.

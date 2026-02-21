@@ -12,6 +12,90 @@ require_cmd kubectl
 REPO_URL="${REPO_URL:-}"
 GITOPS_REVISION="${GITOPS_REVISION:-main}"
 ARGO_WAIT_TIMEOUT="${ARGO_WAIT_TIMEOUT:-1800}"
+RECONCILE_VERBOSE="${RECONCILE_VERBOSE:-true}"
+RECONCILE_POLL_INTERVAL="${RECONCILE_POLL_INTERVAL:-10}"
+RECONCILE_PROGRESS_WIDTH="${RECONCILE_PROGRESS_WIDTH:-24}"
+RECONCILE_PENDING_DETAILS_LIMIT="${RECONCILE_PENDING_DETAILS_LIMIT:-6}"
+
+is_truthy() {
+  local value="${1:-}"
+  case "${value,,}" in
+    1|true|yes|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+require_positive_integer() {
+  local value="$1"
+  local name="$2"
+  if ! [[ "$value" =~ ^[0-9]+$ ]] || (( value <= 0 )); then
+    die "${name} must be a positive integer (received: ${value})"
+  fi
+}
+
+format_duration() {
+  local total_seconds="$1"
+  local hours minutes seconds
+
+  hours=$(( total_seconds / 3600 ))
+  minutes=$(( (total_seconds % 3600) / 60 ))
+  seconds=$(( total_seconds % 60 ))
+
+  if (( hours > 0 )); then
+    printf '%02dh%02dm%02ds' "$hours" "$minutes" "$seconds"
+    return
+  fi
+
+  printf '%02dm%02ds' "$minutes" "$seconds"
+}
+
+render_progress_bar() {
+  local current="$1"
+  local total="$2"
+  local width="$3"
+  local filled empty
+  local filled_segment empty_segment
+
+  filled=0
+  if (( total > 0 )); then
+    filled=$(( current * width / total ))
+  fi
+  (( filled > width )) && filled="$width"
+  empty=$(( width - filled ))
+
+  printf -v filled_segment '%*s' "$filled" ''
+  printf -v empty_segment '%*s' "$empty" ''
+  filled_segment="${filled_segment// /#}"
+  empty_segment="${empty_segment// /-}"
+  printf '%s%s' "$filled_segment" "$empty_segment"
+}
+
+summarize_items() {
+  local limit="$1"
+  shift || true
+  local -a items=("$@")
+  local count="${#items[@]}"
+  local summary
+
+  if (( count == 0 )); then
+    echo "none"
+    return
+  fi
+
+  if (( count > limit )); then
+    summary="$(IFS=', '; echo "${items[*]:0:limit}")"
+    echo "${summary}, +$((count - limit)) more"
+    return
+  fi
+
+  summary="$(IFS=', '; echo "${items[*]}")"
+  echo "$summary"
+}
+
+require_positive_integer "$ARGO_WAIT_TIMEOUT" "ARGO_WAIT_TIMEOUT"
+require_positive_integer "$RECONCILE_POLL_INTERVAL" "RECONCILE_POLL_INTERVAL"
+require_positive_integer "$RECONCILE_PROGRESS_WIDTH" "RECONCILE_PROGRESS_WIDTH"
+require_positive_integer "$RECONCILE_PENDING_DETAILS_LIMIT" "RECONCILE_PENDING_DETAILS_LIMIT"
 
 REPO_URL="${REPO_URL}" GITOPS_REVISION="${GITOPS_REVISION}" "${ROOT_DIR}/scripts/gitops-bootstrap.sh"
 
@@ -64,16 +148,26 @@ for app in "${critical_apps[@]}"; do
   refresh_app "$app"
 done
 
-end_epoch=$(( $(date +%s) + ARGO_WAIT_TIMEOUT ))
+total_apps="${#critical_apps[@]}"
+start_epoch="$(date +%s)"
+end_epoch=$(( start_epoch + ARGO_WAIT_TIMEOUT ))
+
+log "waiting Argo convergence for ${total_apps} critical apps (timeout=$(format_duration "$ARGO_WAIT_TIMEOUT"), poll=${RECONCILE_POLL_INTERVAL}s, verbose=${RECONCILE_VERBOSE})"
+
 while (( $(date +%s) < end_epoch )); do
   now_epoch="$(date +%s)"
   pending=0
   failed=0
+  pending_details=()
+  progressing_apps=()
 
   for app in "${critical_apps[@]}"; do
     if ! kubectl --context k3d-sgp-dev -n argocd get application "$app" >/dev/null 2>&1; then
       refresh_app "$app"
       pending=$((pending + 1))
+      if is_truthy "$RECONCILE_VERBOSE"; then
+        pending_details+=("${app}:missing")
+      fi
       continue
     fi
 
@@ -94,12 +188,18 @@ while (( $(date +%s) < end_epoch )); do
     if [[ -n "$comparison_error" ]]; then
       refresh_app "$app"
       pending=$((pending + 1))
+      if is_truthy "$RECONCILE_VERBOSE"; then
+        pending_details+=("${app}:comparison-error")
+      fi
       continue
     fi
 
     if [[ "$sync_status" != "Synced" ]]; then
       refresh_app "$app"
       pending=$((pending + 1))
+      if is_truthy "$RECONCILE_VERBOSE"; then
+        pending_details+=("${app}:sync=${sync_status}")
+      fi
       continue
     fi
 
@@ -108,6 +208,9 @@ while (( $(date +%s) < end_epoch )); do
     fi
 
     if [[ "$health_status" == "Progressing" ]]; then
+      if is_truthy "$RECONCILE_VERBOSE"; then
+        progressing_apps+=("$app")
+      fi
       continue
     fi
 
@@ -120,12 +223,27 @@ while (( $(date +%s) < end_epoch )); do
   fi
 
   if (( pending == 0 )); then
-    log "reconcile completed: critical applications are synced/healthy"
+    done_bar="$(render_progress_bar "$total_apps" "$total_apps" "$RECONCILE_PROGRESS_WIDTH")"
+    log "reconcile completed: [${done_bar}] ${total_apps}/${total_apps} (100%) critical applications are synced/healthy"
     exit 0
   fi
 
-  log "waiting Argo convergence: ${pending} applications still pending"
-  sleep 10
+  ready_apps=$(( total_apps - pending ))
+  progress_pct=$(( ready_apps * 100 / total_apps ))
+  elapsed_seconds=$(( now_epoch - start_epoch ))
+  remaining_seconds=$(( end_epoch - now_epoch ))
+  (( remaining_seconds < 0 )) && remaining_seconds=0
+  progress_bar="$(render_progress_bar "$ready_apps" "$total_apps" "$RECONCILE_PROGRESS_WIDTH")"
+
+  log "waiting Argo convergence: [${progress_bar}] ${ready_apps}/${total_apps} (${progress_pct}%) pending=${pending} elapsed=$(format_duration "$elapsed_seconds") timeout-in=$(format_duration "$remaining_seconds")"
+  if is_truthy "$RECONCILE_VERBOSE"; then
+    log "pending detail: $(summarize_items "$RECONCILE_PENDING_DETAILS_LIMIT" "${pending_details[@]}")"
+    if (( ${#progressing_apps[@]} > 0 )); then
+      log "synced but progressing: $(summarize_items "$RECONCILE_PENDING_DETAILS_LIMIT" "${progressing_apps[@]}")"
+    fi
+  fi
+
+  sleep "$RECONCILE_POLL_INTERVAL"
 done
 
 echo "timed out waiting for Argo convergence after ${ARGO_WAIT_TIMEOUT}s"

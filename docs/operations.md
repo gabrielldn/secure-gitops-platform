@@ -54,6 +54,9 @@ Observações:
 
 - `make reconcile` executa bootstrap do Argo CD, registro de clusters e espera de convergência dos apps críticos.
 - Por padrão, sem `REPO_URL`, o projeto gera repo renderizado local e publica via `git daemon` em `git://host.k3d.internal:9418/...`.
+- O comando exibe progresso (barra, percentual, apps prontos, tempo decorrido/restante).
+- Verbose vem habilitado por padrão para detalhar apps pendentes em cada ciclo.
+- Para reduzir saída, use `RECONCILE_VERBOSE=false`.
 
 Para usar repositório remoto:
 
@@ -62,6 +65,14 @@ make reconcile PROFILE=light \
   REPO_URL=https://github.com/<org>/secure-gitops-platform.git \
   GITOPS_REVISION=main \
   ARGO_WAIT_TIMEOUT=1800
+```
+
+Ajustes úteis para feedback mais frequente durante convergência:
+
+```bash
+make reconcile PROFILE=light \
+  RECONCILE_VERBOSE=true \
+  RECONCILE_POLL_INTERVAL=5
 ```
 
 ### 4) Segredos e PKI
@@ -76,7 +87,7 @@ make reconcile PROFILE=light
 
 Notas importantes:
 
-- `vault-bootstrap` é de primeira execução; se `.secrets/vault/init.enc.json` já existir, o comando aborta por segurança.
+- `vault-bootstrap` é idempotente no fluxo local: se o Vault atual não estiver inicializado e já existir `.secrets/vault/init.enc.json`, o arquivo antigo é arquivado em `.secrets/vault/archive/` e um novo bootstrap é criado.
 - `stepca-bootstrap` salva material cifrado em `.secrets/step-ca/bootstrap.enc.json`.
 - `render-step-issuer-values.sh` materializa `kid`, `caBundle` e `password` nos manifests de issuer.
 

@@ -15,6 +15,10 @@ fi
 enc_file="${ROOT_DIR}/.secrets/vault/init.enc.json"
 [[ -f "$enc_file" ]] || die "missing encrypted init file: $enc_file"
 
+CTX="${CTX:-k3d-sgp-dev}"
+NS="${NS:-vault}"
+POD="${POD:-vault-0}"
+
 tmp_init="$(mktemp)"
 trap 'rm -f "$tmp_init"' EXIT
 sops --decrypt "$enc_file" > "$tmp_init"
@@ -22,28 +26,43 @@ root_token="$(jq -r '.root_token' "$tmp_init")"
 unseal_key="$(jq -r '.unseal_keys_b64[0]' "$tmp_init")"
 [[ -n "$unseal_key" && "$unseal_key" != "null" ]] || die "missing unseal key in encrypted init material"
 
-for pod in $(kubectl --context k3d-sgp-dev -n vault get pods -l app.kubernetes.io/name=vault -o jsonpath='{.items[*].metadata.name}'); do
-  phase="$(kubectl --context k3d-sgp-dev -n vault get pod "$pod" -o jsonpath='{.status.phase}')"
+read_vault_status_json() {
+  local status_json
+  set +e
+  status_json="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null)"
+  set -e
+  [[ -n "$status_json" ]] || die "unable to read Vault status from ${NS}/${POD}"
+  echo "$status_json"
+}
+
+vault_status_json="$(read_vault_status_json)"
+vault_initialized="$(echo "$vault_status_json" | jq -r '.initialized // "false"')"
+if [[ "$vault_initialized" != "true" ]]; then
+  die "vault is not initialized. Run 'make vault-bootstrap' first (stale .secrets/vault/init.enc.json is auto-archived when needed)."
+fi
+
+for pod in $(kubectl --context "$CTX" -n "$NS" get pods -l app.kubernetes.io/name=vault -o jsonpath='{.items[*].metadata.name}'); do
+  phase="$(kubectl --context "$CTX" -n "$NS" get pod "$pod" -o jsonpath='{.status.phase}')"
   if [[ "$phase" != "Running" ]]; then
     continue
   fi
-  kubectl --context k3d-sgp-dev -n vault exec "$pod" -- vault operator unseal "$unseal_key" >/dev/null 2>&1 || true
+  kubectl --context "$CTX" -n "$NS" exec "$pod" -- vault operator unseal "$unseal_key" >/dev/null 2>&1 || true
 done
 
 for _ in $(seq 1 15); do
-  sealed_state="$(kubectl --context k3d-sgp-dev -n vault exec vault-0 -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
+  sealed_state="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
   if [[ "$sealed_state" == "false" ]]; then
     break
   fi
   sleep 2
 done
 
-sealed_state="$(kubectl --context k3d-sgp-dev -n vault exec vault-0 -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
-[[ "$sealed_state" == "false" ]] || die "vault-0 is still sealed after unseal attempts"
+sealed_state="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
+[[ "$sealed_state" == "false" ]] || die "${POD} is still sealed after unseal attempts"
 
 port_forward_log="$(mktemp)"
 LOCAL_VAULT_PORT="${LOCAL_VAULT_PORT:-18201}"
-kubectl --context k3d-sgp-dev -n vault port-forward pod/vault-0 "${LOCAL_VAULT_PORT}:8200" >"$port_forward_log" 2>&1 &
+kubectl --context "$CTX" -n "$NS" port-forward pod/"$POD" "${LOCAL_VAULT_PORT}:8200" >"$port_forward_log" 2>&1 &
 pf_pid=$!
 trap 'kill $pf_pid >/dev/null 2>&1 || true; rm -f "$tmp_init" "$port_forward_log"' EXIT
 sleep 3
@@ -77,10 +96,31 @@ spec:
   backoffLimit: 0
   template:
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       restartPolicy: Never
+      volumes: []
       containers:
         - name: curl
           image: curlimages/curl:8.11.1
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
           command: ["/bin/sh", "-c"]
           args:
             - curl -sS --max-time 10 http://host.k3d.internal:18200/v1/sys/health >/dev/null

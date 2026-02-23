@@ -12,6 +12,10 @@
 
 Perfis definidos em `platform/profiles/`:
 
+- `tiny` (fallback para hosts com recurso muito limitado):
+  - CPU mínima: 4
+  - Memória mínima: 6 GB
+  - Disco mínimo: 25 GB
 - `light` (padrão para convergência local):
   - CPU mínima: 6
   - Memória mínima: 8 GB

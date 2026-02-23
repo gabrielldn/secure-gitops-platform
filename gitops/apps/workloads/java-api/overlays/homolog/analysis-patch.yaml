@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: java-api-success-rate
+spec:
+  metrics:
+    - name: success-rate
+      successCondition: result[0] >= 0.99
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: java-api-latency-p95
+spec:
+  metrics:
+    - name: latency-p95
+      successCondition: result[0] <= 0.50

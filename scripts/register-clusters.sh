@@ -7,6 +7,7 @@ require_cmd kubectl
 require_cmd jq
 
 DEV_CONTEXT="${DEV_CONTEXT:-k3d-sgp-dev}"
+REGISTER_ENVS="${REGISTER_ENVS:-dev homolog prod}"
 
 kubectl --context "$DEV_CONTEXT" create namespace argocd --dry-run=client -o yaml | kubectl --context "$DEV_CONTEXT" apply -f -
 
@@ -154,10 +155,19 @@ YAML
   create_cluster_secret "$env" "workloads" "$workloads_token" "$server" "$ca_data"
 }
 
+read -r -a register_envs <<< "$REGISTER_ENVS"
+(( ${#register_envs[@]} > 0 )) || die "REGISTER_ENVS must include at least one environment"
+for env in "${register_envs[@]}"; do
+  case "$env" in
+    dev|homolog|prod) ;;
+    *) die "unsupported environment in REGISTER_ENVS: ${env} (allowed: dev homolog prod)" ;;
+  esac
+done
+
 # Cleanup old registration objects from previous layout.
 kubectl --context "$DEV_CONTEXT" -n argocd delete secret cluster-k3d-sgp-dev cluster-k3d-sgp-homolog cluster-k3d-sgp-prod --ignore-not-found >/dev/null 2>&1 || true
 
-for env in dev homolog prod; do
+for env in "${register_envs[@]}"; do
   register_cluster "$env"
 done
 

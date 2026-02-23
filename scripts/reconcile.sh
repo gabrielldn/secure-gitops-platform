@@ -8,6 +8,7 @@ if [[ -f "${ROOT_DIR}/.kube/config" ]]; then
 fi
 
 require_cmd kubectl
+require_cmd jq
 
 REPO_URL="${REPO_URL:-}"
 GITOPS_REVISION="${GITOPS_REVISION:-main}"
@@ -16,6 +17,9 @@ RECONCILE_VERBOSE="${RECONCILE_VERBOSE:-true}"
 RECONCILE_POLL_INTERVAL="${RECONCILE_POLL_INTERVAL:-10}"
 RECONCILE_PROGRESS_WIDTH="${RECONCILE_PROGRESS_WIDTH:-24}"
 RECONCILE_PENDING_DETAILS_LIMIT="${RECONCILE_PENDING_DETAILS_LIMIT:-6}"
+RECONCILE_ENVS="${RECONCILE_ENVS:-dev homolog prod}"
+RECONCILE_INCLUDE_SECRET_CONFIG="${RECONCILE_INCLUDE_SECRET_CONFIG:-true}"
+RECONCILE_INCLUDE_OBSERVABILITY="${RECONCILE_INCLUDE_OBSERVABILITY:-true}"
 
 is_truthy() {
   local value="${1:-}"
@@ -97,14 +101,50 @@ require_positive_integer "$RECONCILE_POLL_INTERVAL" "RECONCILE_POLL_INTERVAL"
 require_positive_integer "$RECONCILE_PROGRESS_WIDTH" "RECONCILE_PROGRESS_WIDTH"
 require_positive_integer "$RECONCILE_PENDING_DETAILS_LIMIT" "RECONCILE_PENDING_DETAILS_LIMIT"
 
-REPO_URL="${REPO_URL}" GITOPS_REVISION="${GITOPS_REVISION}" "${ROOT_DIR}/scripts/gitops-bootstrap.sh"
+read -r -a reconcile_envs <<< "$RECONCILE_ENVS"
+(( ${#reconcile_envs[@]} > 0 )) || die "RECONCILE_ENVS must include at least one environment"
+for env in "${reconcile_envs[@]}"; do
+  case "$env" in
+    dev|homolog|prod) ;;
+    *) die "unsupported environment in RECONCILE_ENVS: ${env} (allowed: dev homolog prod)" ;;
+  esac
+done
+
+REPO_URL="${REPO_URL}" GITOPS_REVISION="${GITOPS_REVISION}" REGISTER_ENVS="${RECONCILE_ENVS}" "${ROOT_DIR}/scripts/gitops-bootstrap.sh"
+
+contains_env() {
+  local needle="$1"
+  shift
+  local env
+  for env in "$@"; do
+    if [[ "$env" == "$needle" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+appset_elements_json="$(printf '%s\n' "${reconcile_envs[@]}" | jq -R '{env:.}' | jq -s '.')"
+appset_patch="$(jq -cn --argjson elements "$appset_elements_json" '{spec:{generators:[{list:{elements:$elements}}]}}')"
+kubectl --context k3d-sgp-dev -n argocd patch applicationset cluster-roots --type merge -p "$appset_patch" >/dev/null
+
+for env in dev homolog prod; do
+  if contains_env "$env" "${reconcile_envs[@]}"; then
+    continue
+  fi
+
+  while IFS= read -r app; do
+    [[ -n "$app" ]] || continue
+    kubectl --context k3d-sgp-dev -n argocd delete "$app" --ignore-not-found >/dev/null 2>&1 || true
+  done < <(kubectl --context k3d-sgp-dev -n argocd get applications -o name | grep "^application.argoproj.io/${env}-" || true)
+done
 
 effective_repo_url="$(kubectl --context k3d-sgp-dev -n argocd get applicationset cluster-roots -o jsonpath='{.spec.template.spec.source.repoURL}')"
 effective_revision="$(kubectl --context k3d-sgp-dev -n argocd get applicationset cluster-roots -o jsonpath='{.spec.template.spec.source.targetRevision}')"
 [[ -n "$effective_repo_url" ]] || die "unable to resolve effective repoURL from ApplicationSet"
 [[ -n "$effective_revision" ]] || die "unable to resolve effective revision from ApplicationSet"
 
-for env in dev homolog prod; do
+for env in "${reconcile_envs[@]}"; do
   rendered_apps="$(mktemp)"
   sed \
     -e "s#__REPO_URL__#${effective_repo_url}#g" \
@@ -114,30 +154,23 @@ for env in dev homolog prod; do
   rm -f "$rendered_apps"
 done
 
-critical_apps=(
-  dev-cert-manager
-  homolog-cert-manager
-  prod-cert-manager
-  dev-vault
-  dev-kube-prometheus-stack
-  homolog-kube-prometheus-stack
-  prod-kube-prometheus-stack
-  dev-step-issuer
-  homolog-step-issuer
-  prod-step-issuer
-  dev-external-secrets
-  homolog-external-secrets
-  prod-external-secrets
-  dev-external-secret-config
-  homolog-external-secret-config
-  prod-external-secret-config
-  dev-step-cluster-issuer
-  homolog-step-cluster-issuer
-  prod-step-cluster-issuer
-  dev-argo-rollouts
-  homolog-argo-rollouts
-  prod-argo-rollouts
-)
+critical_apps=()
+for env in "${reconcile_envs[@]}"; do
+  critical_apps+=("${env}-cert-manager")
+  if [[ "$env" == "dev" ]]; then
+    critical_apps+=("dev-vault")
+  fi
+  if is_truthy "$RECONCILE_INCLUDE_OBSERVABILITY"; then
+    critical_apps+=("${env}-kube-prometheus-stack")
+  fi
+  critical_apps+=("${env}-step-issuer")
+  critical_apps+=("${env}-external-secrets")
+  if is_truthy "$RECONCILE_INCLUDE_SECRET_CONFIG"; then
+    critical_apps+=("${env}-external-secret-config")
+  fi
+  critical_apps+=("${env}-step-cluster-issuer")
+  critical_apps+=("${env}-argo-rollouts")
+done
 
 refresh_app() {
   local app="$1"
@@ -161,7 +194,7 @@ total_apps="${#critical_apps[@]}"
 start_epoch="$(date +%s)"
 end_epoch=$(( start_epoch + ARGO_WAIT_TIMEOUT ))
 
-log "waiting Argo convergence for ${total_apps} critical apps (timeout=$(format_duration "$ARGO_WAIT_TIMEOUT"), poll=${RECONCILE_POLL_INTERVAL}s, verbose=${RECONCILE_VERBOSE})"
+log "waiting Argo convergence for ${total_apps} critical apps (envs=${RECONCILE_ENVS}, timeout=$(format_duration "$ARGO_WAIT_TIMEOUT"), poll=${RECONCILE_POLL_INTERVAL}s, verbose=${RECONCILE_VERBOSE})"
 
 while (( $(date +%s) < end_epoch )); do
   now_epoch="$(date +%s)"

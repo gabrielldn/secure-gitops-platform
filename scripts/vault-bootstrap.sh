@@ -7,6 +7,8 @@ require_cmd kubectl
 require_cmd jq
 require_cmd sops
 require_cmd age-keygen
+require_cmd vault
+require_cmd timeout
 
 if [[ -f "${ROOT_DIR}/.kube/config" ]]; then
   export KUBECONFIG="${ROOT_DIR}/.kube/config"
@@ -15,6 +17,9 @@ fi
 CTX="${CTX:-k3d-sgp-dev}"
 NS="${NS:-vault}"
 POD="${POD:-vault-0}"
+LOCAL_VAULT_PORT="${LOCAL_VAULT_PORT:-18201}"
+VAULT_PORT_FORWARD_WAIT_SECONDS="${VAULT_PORT_FORWARD_WAIT_SECONDS:-3}"
+VAULT_CMD_TIMEOUT_SECONDS="${VAULT_CMD_TIMEOUT_SECONDS:-45}"
 
 mkdir -p "${ROOT_DIR}/.secrets"
 mkdir -p "${ROOT_DIR}/.secrets/vault"
@@ -45,12 +50,30 @@ kubectl --context "$CTX" -n "$NS" wait --for=jsonpath='{.status.phase}'=Running 
 plain_file="${ROOT_DIR}/.secrets/vault/init.json"
 enc_file="${ROOT_DIR}/.secrets/vault/init.enc.json"
 archive_dir="${ROOT_DIR}/.secrets/vault/archive"
+port_forward_log="$(mktemp)"
+
+kubectl --context "$CTX" -n "$NS" port-forward pod/"$POD" "${LOCAL_VAULT_PORT}:8200" >"$port_forward_log" 2>&1 &
+pf_pid=$!
+trap 'kill "$pf_pid" >/dev/null 2>&1 || true; rm -f "$port_forward_log" "$plain_file"' EXIT
+
+sleep "$VAULT_PORT_FORWARD_WAIT_SECONDS"
+if ! kill -0 "$pf_pid" >/dev/null 2>&1; then
+  cat "$port_forward_log" || true
+  die "failed to start vault port-forward on ${LOCAL_VAULT_PORT}"
+fi
+
+export VAULT_ADDR="http://127.0.0.1:${LOCAL_VAULT_PORT}"
 
 read_vault_status_json() {
   local status_json
+  local rc
   set +e
-  status_json="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null)"
+  status_json="$(timeout "${VAULT_CMD_TIMEOUT_SECONDS}s" vault status -format=json 2>/dev/null)"
+  rc=$?
   set -e
+  if [[ "$rc" -eq 124 ]]; then
+    die "vault status timed out after ${VAULT_CMD_TIMEOUT_SECONDS}s"
+  fi
   [[ -n "$status_json" ]] || die "unable to read Vault status from ${NS}/${POD}"
   echo "$status_json"
 }
@@ -73,22 +96,35 @@ if [[ -f "$enc_file" ]]; then
   warn "vault is uninitialized but encrypted init material existed; archived stale file to ${backup_file}"
 fi
 
-kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault operator init -key-shares=1 -key-threshold=1 -format=json > "$plain_file"
+timeout "${VAULT_CMD_TIMEOUT_SECONDS}s" vault operator init -key-shares=1 -key-threshold=1 -format=json > "$plain_file"
+[[ -s "$plain_file" ]] || die "vault init produced empty output"
 
 unseal_key="$(jq -r '.unseal_keys_b64[0]' "$plain_file")"
 root_token="$(jq -r '.root_token' "$plain_file")"
-
-kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault operator unseal "$unseal_key" >/dev/null
-
-sealed_state="$(kubectl --context "$CTX" -n "$NS" exec "$POD" -- vault status -format=json 2>/dev/null | jq -r '.sealed' 2>/dev/null || true)"
-[[ "$sealed_state" == "false" ]] || die "vault init completed, but ${POD} remains sealed"
+[[ -n "$unseal_key" && "$unseal_key" != "null" ]] || die "failed to read unseal key from init output"
+[[ -n "$root_token" && "$root_token" != "null" ]] || die "failed to read root token from init output"
 
 sops --encrypt --input-type json --output-type json "$plain_file" > "$enc_file"
 rm -f "$plain_file"
 
+if ! timeout "${VAULT_CMD_TIMEOUT_SECONDS}s" vault operator unseal "$unseal_key" >/dev/null; then
+  warn "vault unseal command failed during bootstrap; encrypted init material is available for retry"
+fi
+
+sealed_state="true"
+for _ in $(seq 1 15); do
+  sealed_state="$(read_vault_status_json | jq -r '.sealed // "true"')"
+  if [[ "$sealed_state" == "false" ]]; then
+    break
+  fi
+  sleep 2
+done
+if [[ "$sealed_state" != "false" ]]; then
+  warn "vault init completed, but ${POD} remains sealed; proceed with make vault-configure to retry unseal"
+  log "vault initialized and sealed material encrypted at ${enc_file}"
+  exit 0
+fi
+
 log "vault initialized and sealed material encrypted at ${enc_file}"
 log "root token saved encrypted; use sops to decrypt only when needed"
-
-if [[ -n "$root_token" ]]; then
-  log "vault bootstrap completed"
-fi
+log "vault bootstrap completed"

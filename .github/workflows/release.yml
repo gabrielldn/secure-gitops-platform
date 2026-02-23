@@ -19,6 +19,11 @@ on:
         required: false
         default: false
         type: boolean
+      workload_ref:
+        description: Ref (branch/tag/SHA) do repositório do workload Java
+        required: false
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -30,11 +35,20 @@ jobs:
   build-sign-attest:
     runs-on: ${{ github.event_name == 'workflow_dispatch' && inputs.runner == 'self-hosted' && 'self-hosted' || 'ubuntu-latest' }}
     env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/secure-gitops-demo-app
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/java-api-with-otlp-sdk
+      WORKLOAD_REPOSITORY: ${{ github.repository_owner }}/java-api-with-otlp-sdk
+      WORKLOAD_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.workload_ref || 'main' }}
       ENABLE_LOCAL_SYNC: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_local_sync && 'true' || 'false' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Checkout workload source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKLOAD_REPOSITORY }}
+          ref: ${{ env.WORKLOAD_REF }}
+          path: workload-src
 
       - name: Ensure Linux runner
         if: runner.os != 'Linux'
@@ -91,11 +105,14 @@ jobs:
         id: image
         run: |
           set -euo pipefail
+          WORKLOAD_SHA="$(git -C workload-src rev-parse HEAD)"
           IMAGE_TAG="${GITHUB_SHA::12}"
           IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
-          docker build -t "${IMAGE_REF}" supply-chain/demo-app
+          docker build -t "${IMAGE_REF}" workload-src
           docker push "${IMAGE_REF}"
           DIGEST="$(crane digest "${IMAGE_REF}")"
+          echo "workload_repo=${WORKLOAD_REPOSITORY}" >> "$GITHUB_OUTPUT"
+          echo "workload_sha=${WORKLOAD_SHA}" >> "$GITHUB_OUTPUT"
           echo "image_ref=${IMAGE_NAME}@${DIGEST}" >> "$GITHUB_OUTPUT"
           echo "image_digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
@@ -149,8 +166,8 @@ jobs:
           cp supply-chain/attestations/slsa-provenance-template.json provenance.json
           sed -i "s#IMAGE_REF#${{ steps.image.outputs.image_ref }}#g" provenance.json
           sed -i "s#IMAGE_DIGEST#${{ steps.image.outputs.image_digest }}#g" provenance.json
-          sed -i "s#GIT_SHA#${GITHUB_SHA}#g" provenance.json
-          sed -i "s#OWNER/REPO#${GITHUB_REPOSITORY}#g" provenance.json
+          sed -i "s#GIT_SHA#${{ steps.image.outputs.workload_sha }}#g" provenance.json
+          sed -i "s#OWNER/REPO#${{ steps.image.outputs.workload_repo }}#g" provenance.json
 
       - name: Attach SBOM attestation
         run: |
@@ -175,6 +192,8 @@ jobs:
           set -euo pipefail
           printf '%s\n' "${{ steps.image.outputs.image_ref }}" > image-ref.txt
           printf '%s\n' "${{ steps.image.outputs.image_digest }}" > image-digest.txt
+          printf '%s\n' "${{ steps.image.outputs.workload_repo }}" > workload-repo.txt
+          printf '%s\n' "${{ steps.image.outputs.workload_sha }}" > workload-sha.txt
 
       - name: Verify signature and attestations (Cosign)
         run: |
@@ -221,6 +240,8 @@ jobs:
             trivy.json
             image-ref.txt
             image-digest.txt
+            workload-repo.txt
+            workload-sha.txt
             cosign.pub
             cosign-verify-signature.txt
             cosign-verify-attestation-spdx.txt

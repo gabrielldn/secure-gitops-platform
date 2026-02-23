@@ -38,7 +38,7 @@ Regras críticas atuais do audit:
 ## 4) Evidência mínima para público
 
 1. Publicar artefatos de release no GitHub Actions (SBOM, scans, verify, attestation).
-2. Garantir `docs/demo.md` com cenário allow/deny reproduzível usando `secure-gitops-demo-app`.
+2. Garantir `docs/demo.md` com cenário allow/deny reproduzível usando `java-api-with-otlp-sdk`.
 3. Garantir `docs/security-model.md` e ADRs atualizados.
 
 ## 5) Governança

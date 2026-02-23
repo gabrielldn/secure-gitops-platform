@@ -9,6 +9,16 @@
 
 Plataforma Kubernetes local `production-like` para laboratório DevSecOps em Linux (Ubuntu 24.04+ nativo ou WSL2), com `k3d` + 3 clusters (`sgp-dev`, `sgp-homolog`, `sgp-prod`), GitOps central, políticas de segurança, supply chain, PKI, gestão de segredos, rollout progressivo e observabilidade.
 
+## Sistema conectado (3 repositórios)
+
+- Workload de referência: `java-api-with-otlp-sdk`
+  - https://github.com/gabrielldn/java-api-with-otlp-sdk
+- Banco HA/Chaos de referência: `postgres-ha-chaos-lab`
+  - https://github.com/gabrielldn/postgres-ha-chaos-lab
+- Plataforma governante: `secure-gitops-platform` (este repositório)
+
+Cadeia de demonstração: código Java instrumentado -> release com SBOM/scan/assinatura/attestation -> deploy GitOps com canary e AnalysisTemplate -> backend Postgres HA.
+
 ## Objetivo do projeto
 
 Entregar um ambiente reproduzível para praticar e demonstrar:
@@ -46,12 +56,13 @@ Portas locais relevantes no host:
 - Ingress `prod`: `8083` (HTTP), `8446` (HTTPS)
 - Vault hub (via LB dev): `http://host.k3d.internal:18200`
 - Step-CA hub (via LB dev): `https://host.k3d.internal:19443`
+- Postgres HA lab (RW externo): `host.k3d.internal:15432`
 
 ## Contratos do repositório
 
 - Operação: `Makefile` (`make doctor`, `make up`, `make reconcile`, `make verify`, etc.).
 - Versões pinadas: `platform/versions.lock.yaml`.
-- Perfis de sizing: `platform/profiles/light.yaml` e `platform/profiles/full.yaml`.
+- Perfis de sizing: `platform/profiles/tiny.yaml`, `platform/profiles/light.yaml` e `platform/profiles/full.yaml`.
 - Bootstrap GitOps: `gitops/bootstrap/`.
 - Fonte de verdade por ambiente: `gitops/clusters/{dev,homolog,prod}/`.
 - Políticas: `policies/kyverno/` + testes em `policies/tests/kyverno/`.
@@ -68,6 +79,12 @@ Portas locais relevantes no host:
 make doctor PROFILE=light
 ```
 
+Se o host estiver no limite de recursos, use o perfil mínimo:
+
+```bash
+make doctor PROFILE=tiny
+```
+
 2. Instalar toolchain (quando necessário):
 
 ```bash
@@ -82,10 +99,39 @@ Durante esse passo, quando aparecer `BECOME password:`, informe a senha de `sudo
 make up PROFILE=light
 ```
 
+Fallback para host com pouca RAM/CPU:
+
+```bash
+make up PROFILE=tiny
+```
+
+Para laboratório ultra-enxuto (apenas `dev`):
+
+```bash
+make up PROFILE=tiny CLUSTER_ENVS=dev
+```
+
 4. Bootstrap GitOps e convergência inicial:
 
 ```bash
 make reconcile PROFILE=light
+```
+
+Fallback para host com pouca RAM/CPU:
+
+```bash
+make reconcile PROFILE=tiny
+```
+
+Modo mínimo para validação conjunta em host no limite (aplica apenas `dev` e reduz gates críticos):
+
+```bash
+make reconcile \
+  PROFILE=tiny \
+  RECONCILE_ENVS=dev \
+  RECONCILE_INCLUDE_OBSERVABILITY=false \
+  RECONCILE_INCLUDE_SECRET_CONFIG=false \
+  RECONCILE_VERBOSE=false
 ```
 
 Verbose já é padrão no `make reconcile`. Para saída reduzida:
@@ -104,6 +150,16 @@ make vault-configure
 make reconcile PROFILE=light
 ```
 
+Para alinhar com um `postgres-ha-chaos-lab` customizado, ajuste antes de `make vault-configure`:
+
+```bash
+export JAVA_API_DB_HOST=host.k3d.internal
+export JAVA_API_DB_PORT=15432
+export JAVA_API_DB_NAME=appdb
+export JAVA_API_DB_USER=appuser
+export JAVA_API_DB_PASS=dummy-apppass-change-me
+```
+
 6. Verificação:
 
 ```bash
@@ -115,6 +171,12 @@ make verify PROFILE=light
 
 ```bash
 make down
+```
+
+Se tiver subido somente `dev`, pode desligar apenas esse ambiente:
+
+```bash
+make down CLUSTER_ENVS=dev
 ```
 
 8. Gerar evidências do supply chain:
@@ -140,19 +202,19 @@ Esse fluxo evita erro de digest incorreto e garante que `cosign verify` use a ch
 - `make doctor`: valida pré-requisitos, perfil e versões de chart.
 - `make versions`: imprime matriz pinada de versões.
 - `make bootstrap`: instala toolchain local via Ansible.
-- `make up`: sobe registry + 3 clusters k3d.
+- `make up`: sobe registry + clusters k3d selecionados (default: `dev homolog prod`; use `CLUSTER_ENVS=dev` para modo enxuto).
 - `make gitops-bootstrap`: instala Argo CD e registra clusters.
 - `make reconcile`: bootstrap GitOps + espera de convergência dos apps críticos.
   - Verbose é padrão; use `RECONCILE_VERBOSE=false` para reduzir logs e `RECONCILE_POLL_INTERVAL=<segundos>` para ajustar intervalo de atualização.
 - `make vault-bootstrap`: inicializa Vault e guarda bootstrap cifrado.
-- `make vault-configure`: configura auth/policies do Vault para ESO e publica `kv/apps/pki/step-issuer`.
+- `make vault-configure`: configura auth/policies do Vault para ESO e publica `kv/apps/pki/step-issuer` e `kv/apps/java-api/db`.
 - `make stepca-bootstrap`: extrai material de bootstrap do Step-CA para `.secrets` cifrada.
 - `make verify-quick`: health-check essencial.
 - `make verify`: verificação E2E (inclui issuer pronto em todos os clusters).
 - `make evidence`: pacote de evidência (cosign verify, attestations, SBOM, scans, policy reports).
   - Pré-condições: chave Cosign renderizada + `IMAGE_REF` vindo de run bem-sucedido do `release.yml`.
 - `make sanitize-check`: auditoria não-destrutiva para publicação pública sanitizada.
-- `make down`: remove clusters e registry local.
+- `make down`: remove clusters selecionados; remove registry apenas quando não restar cluster `sgp-*` ativo.
 - `make clean`: limpeza local previsível.
 
 ## CI/CD e supply chain
@@ -160,7 +222,7 @@ Esse fluxo evita erro de digest incorreto e garante que `cosign verify` use a ch
 Workflows em `.github/workflows/`:
 
 - `pr.yml`: validação de manifestos, testes de policy e scan de configuração.
-- `release.yml`: build, SBOM (Syft), scans (Grype/Trivy), assinatura (Cosign), attestation e verificações pós-assinatura.
+- `release.yml`: checkout do `java-api-with-otlp-sdk`, build da imagem, SBOM (Syft), scans (Grype/Trivy), assinatura (Cosign), attestation e verificações pós-assinatura.
 - `local-registry-sync.yml`: sincronização manual de imagem por digest para registry local.
 
 ## Segurança

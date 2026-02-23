@@ -23,10 +23,22 @@ No `make bootstrap`, o prompt `BECOME password:` pede a senha de `sudo` do usuá
 make up PROFILE=light
 ```
 
+Fallback para host com recurso muito limitado:
+
+```bash
+make up PROFILE=tiny
+```
+
+Modo ultra-enxuto (somente `dev`):
+
+```bash
+make up PROFILE=tiny CLUSTER_ENVS=dev
+```
+
 Cria:
 
 - Registry local (`localhost:5001`)
-- Clusters `sgp-dev`, `sgp-homolog`, `sgp-prod`
+- Clusters definidos em `CLUSTER_ENVS` (default: `sgp-dev`, `sgp-homolog`, `sgp-prod`)
 - Kubeconfig local em `.kube/config`
 
 Parâmetros úteis para ambientes com CPU limitada/instável:
@@ -48,6 +60,23 @@ Comportamento de retry:
 
 ```bash
 make reconcile PROFILE=light
+```
+
+Fallback para host com recurso muito limitado:
+
+```bash
+make reconcile PROFILE=tiny
+```
+
+Modo mínimo para validação conjunta em host no limite (escopo `dev`):
+
+```bash
+make reconcile \
+  PROFILE=tiny \
+  RECONCILE_ENVS=dev \
+  RECONCILE_INCLUDE_OBSERVABILITY=false \
+  RECONCILE_INCLUDE_SECRET_CONFIG=false \
+  RECONCILE_VERBOSE=false
 ```
 
 Observações:
@@ -85,11 +114,21 @@ make vault-configure
 make reconcile PROFILE=light
 ```
 
+Se o backend do `postgres-ha-chaos-lab` estiver com valores diferentes do default, exporte antes de `make vault-configure`:
+
+```bash
+export JAVA_API_DB_HOST=host.k3d.internal
+export JAVA_API_DB_PORT=15432
+export JAVA_API_DB_NAME=appdb
+export JAVA_API_DB_USER=appuser
+export JAVA_API_DB_PASS=dummy-apppass-change-me
+```
+
 Notas importantes:
 
 - `vault-bootstrap` é idempotente no fluxo local: se o Vault atual não estiver inicializado e já existir `.secrets/vault/init.enc.json`, o arquivo antigo é arquivado em `.secrets/vault/archive/` e um novo bootstrap é criado.
 - `stepca-bootstrap` salva material cifrado em `.secrets/step-ca/bootstrap.enc.json`.
-- `vault-configure` publica `provisioner_password` em `kv/apps/pki/step-issuer` para consumo via ESO.
+- `vault-configure` publica `provisioner_password` em `kv/apps/pki/step-issuer` e credenciais JDBC em `kv/apps/java-api/db` para consumo via ESO.
 - `render-step-issuer-values.sh` materializa `kid`, `caBundle` e `url` nos manifests do `StepClusterIssuer`.
 
 ### 5) Verificação
@@ -123,6 +162,13 @@ make policy-test
 ```bash
 ./scripts/promote-image.sh dev homolog
 ./scripts/promote-image.sh homolog prod
+```
+
+Os comandos acima promovem o workload default (`java-api`). Para promover outro workload/container explicitamente:
+
+```bash
+./scripts/promote-image.sh dev homolog podinfo podinfo
+./scripts/promote-image.sh homolog prod podinfo podinfo
 ```
 
 - Gerar pacote de evidência (SBOM, scan, verify e policy reports):
@@ -184,6 +230,12 @@ Relatório:
 ```bash
 make down
 make clean
+```
+
+Se tiver subido apenas `dev`, pode usar:
+
+```bash
+make down CLUSTER_ENVS=dev
 ```
 
 ## Troubleshooting rápido

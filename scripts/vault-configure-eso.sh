@@ -80,6 +80,19 @@ fi
 
 vault kv put kv/apps/podinfo message="secure-gitops-platform"
 
+JAVA_API_DB_HOST="${JAVA_API_DB_HOST:-host.k3d.internal}"
+JAVA_API_DB_PORT="${JAVA_API_DB_PORT:-15432}"
+JAVA_API_DB_NAME="${JAVA_API_DB_NAME:-appdb}"
+JAVA_API_DB_USER="${JAVA_API_DB_USER:-appuser}"
+JAVA_API_DB_PASS="${JAVA_API_DB_PASS:-dummy-apppass-change-me}"
+JAVA_API_DB_URL="${JAVA_API_DB_URL:-jdbc:postgresql://${JAVA_API_DB_HOST}:${JAVA_API_DB_PORT}/${JAVA_API_DB_NAME}}"
+
+vault kv put kv/apps/java-api/db \
+  spring_datasource_url="${JAVA_API_DB_URL}" \
+  spring_datasource_username="${JAVA_API_DB_USER}" \
+  spring_datasource_password="${JAVA_API_DB_PASS}" \
+  spring_datasource_driver_class_name="org.postgresql.Driver"
+
 step_bootstrap_enc="${ROOT_DIR}/.secrets/step-ca/bootstrap.enc.json"
 [[ -f "$step_bootstrap_enc" ]] || die "missing step-ca bootstrap material: $step_bootstrap_enc"
 step_bootstrap_tmp="$(mktemp)"

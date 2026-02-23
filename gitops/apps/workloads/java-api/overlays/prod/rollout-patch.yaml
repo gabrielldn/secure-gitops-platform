@@ -1,0 +1,14 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: java-api
+spec:
+  replicas: 4
+  template:
+    spec:
+      containers:
+        - name: java-api
+          image: ghcr.io/gabrielldn/java-api-with-otlp-sdk@sha256:1111111111111111111111111111111111111111111111111111111111111111
+          env:
+            - name: APP_ENV
+              value: prod

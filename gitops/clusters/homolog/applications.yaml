@@ -441,7 +441,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: homolog-demo-app
+  name: homolog-java-api
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "55"
@@ -453,7 +453,7 @@ spec:
   source:
     repoURL: __REPO_URL__
     targetRevision: __GITOPS_REVISION__
-    path: gitops/apps/workloads/demo-app/overlays/homolog
+    path: gitops/apps/workloads/java-api/overlays/homolog
   syncPolicy:
     automated:
       prune: true

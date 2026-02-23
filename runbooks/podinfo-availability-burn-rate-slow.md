@@ -26,8 +26,8 @@ Investigar degradação sustentada de disponibilidade antes de atingir o nível 
    - `make verify-quick PROFILE=light`
 6. Se houver tendência de piora, antecipar mitigação:
    - promover digest estável:
-     - `./scripts/promote-image.sh dev homolog`
-     - `./scripts/promote-image.sh homolog prod`
+     - `./scripts/promote-image.sh dev homolog podinfo podinfo`
+     - `./scripts/promote-image.sh homolog prod podinfo podinfo`
 
 ## Critério de recuperação
 

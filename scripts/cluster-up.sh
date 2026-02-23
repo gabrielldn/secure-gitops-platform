@@ -18,6 +18,7 @@ create_retries="${K3D_CREATE_RETRIES:-3}"
 create_timeout="${K3D_CREATE_TIMEOUT:-420s}"
 retry_base_delay_seconds="${K3D_RETRY_BASE_DELAY_SECONDS:-20}"
 retry_on_any_error="${K3D_RETRY_ON_ANY_ERROR:-false}"
+CLUSTER_ENVS="${CLUSTER_ENVS:-dev homolog prod}"
 
 cluster_exists() {
   local cluster_name="$1"
@@ -113,8 +114,22 @@ else
 fi
 
 mkdir -p "${ROOT_DIR}/.kube"
+read -r -a cluster_envs <<< "$CLUSTER_ENVS"
+(( ${#cluster_envs[@]} > 0 )) || die "CLUSTER_ENVS must include at least one environment"
+for env in "${cluster_envs[@]}"; do
+  case "$env" in
+    dev|homolog|prod) ;;
+    *) die "unsupported environment in CLUSTER_ENVS: ${env} (allowed: dev homolog prod)" ;;
+  esac
+done
+log "selected cluster environments: ${cluster_envs[*]}"
 
-for cluster in dev homolog prod; do
+rm -f "${ROOT_DIR}/.kube/sgp-dev.yaml" \
+      "${ROOT_DIR}/.kube/sgp-homolog.yaml" \
+      "${ROOT_DIR}/.kube/sgp-prod.yaml"
+
+kubeconfig_parts=()
+for cluster in "${cluster_envs[@]}"; do
   cluster_name="sgp-${cluster}"
   cfg="$(k3d_config_file "$cluster")"
 
@@ -131,21 +146,24 @@ for cluster in dev homolog prod; do
     log "cluster ${cluster_name} already exists"
   fi
 
-  k3d kubeconfig get "$cluster_name" > "${ROOT_DIR}/.kube/${cluster_name}.yaml"
+  kubeconfig_file="${ROOT_DIR}/.kube/${cluster_name}.yaml"
+  k3d kubeconfig get "$cluster_name" > "${kubeconfig_file}"
+  kubeconfig_parts+=("${kubeconfig_file}")
 
-  if ! cluster_api_ready "${ROOT_DIR}/.kube/${cluster_name}.yaml"; then
+  if ! cluster_api_ready "${kubeconfig_file}"; then
     warn "cluster ${cluster_name} API is not reachable after kubeconfig export; recreating"
     cleanup_failed_cluster_artifacts "$cluster_name"
     if ! create_cluster_with_retry "$cluster_name" "$cfg"; then
       die "failed to recover cluster ${cluster_name} after kubeconfig/API validation failure"
     fi
-    k3d kubeconfig get "$cluster_name" > "${ROOT_DIR}/.kube/${cluster_name}.yaml"
-    cluster_api_ready "${ROOT_DIR}/.kube/${cluster_name}.yaml" || \
+    k3d kubeconfig get "$cluster_name" > "${kubeconfig_file}"
+    cluster_api_ready "${kubeconfig_file}" || \
       die "cluster ${cluster_name} API still unreachable after recovery attempt"
   fi
 done
 
-export KUBECONFIG="${ROOT_DIR}/.kube/sgp-dev.yaml:${ROOT_DIR}/.kube/sgp-homolog.yaml:${ROOT_DIR}/.kube/sgp-prod.yaml"
+(( ${#kubeconfig_parts[@]} > 0 )) || die "no kubeconfig files generated from CLUSTER_ENVS=${CLUSTER_ENVS}"
+export KUBECONFIG="$(IFS=:; echo "${kubeconfig_parts[*]}")"
 kubectl config view --flatten > "${ROOT_DIR}/.kube/config"
 
 log "kubeconfig written to ${ROOT_DIR}/.kube/config"

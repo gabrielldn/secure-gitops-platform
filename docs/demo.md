@@ -39,13 +39,13 @@ echo "IMAGE_REF=${IMAGE_REF}"
 
 ## Cenário A: deploy aprovado
 
-1. Atualize apenas o `demo-app` em `homolog` e `prod`:
+1. Atualize apenas o `java-api` em `homolog` e `prod`:
 
 ```bash
-yq -i '.spec.replicas = 2' gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml
-yq -i '.spec.replicas = 2' gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
-yq -i '(.spec.template.spec.containers[] | select(.name=="app") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml
-yq -i '(.spec.template.spec.containers[] | select(.name=="app") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
+yq -i '.spec.replicas = 2' gitops/apps/workloads/java-api/overlays/homolog/rollout-patch.yaml
+yq -i '.spec.replicas = 2' gitops/apps/workloads/java-api/overlays/prod/rollout-patch.yaml
+yq -i '(.spec.template.spec.containers[] | select(.name=="java-api") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/java-api/overlays/homolog/rollout-patch.yaml
+yq -i '(.spec.template.spec.containers[] | select(.name=="java-api") | .image) = strenv(IMAGE_REF)' gitops/apps/workloads/java-api/overlays/prod/rollout-patch.yaml
 ```
 
 2. Reconcile:
@@ -57,15 +57,15 @@ make reconcile PROFILE=light
 3. Confirme o deploy saudável:
 
 ```bash
-kubectl --context k3d-sgp-homolog -n apps get deploy secure-gitops-demo-app
-kubectl --context k3d-sgp-prod -n apps get deploy secure-gitops-demo-app
+kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout java-api
+kubectl --context k3d-sgp-prod -n apps argo rollouts get rollout java-api
 kubectl --context k3d-sgp-homolog -n apps get events --sort-by=.lastTimestamp | tail -n 20
 kubectl --context k3d-sgp-prod -n apps get events --sort-by=.lastTimestamp | tail -n 20
 ```
 
 Resultado esperado:
 
-- Deployment `secure-gitops-demo-app` disponível nos dois ambientes.
+- Rollout `java-api` saudável nos dois ambientes.
 - Sem erro de admission do Kyverno para essa versão assinada/atestada.
 
 4. Gere evidência do supply chain:
@@ -79,20 +79,20 @@ make evidence IMAGE_REF="${IMAGE_REF}"
 1. Aplique um Pod com digest inválido em `homolog` e `prod`:
 
 ```bash
-cat <<'EOF2' >/tmp/demo-app-deny.yaml
+cat <<'EOF2' >/tmp/java-api-deny.yaml
 apiVersion: v1
 kind: Pod
 metadata:
-  name: demo-app-deny-test
+  name: java-api-deny-test
   namespace: apps
 spec:
   containers:
-    - name: app
-      image: ghcr.io/gabrielldn/secure-gitops-demo-app@sha256:1111111111111111111111111111111111111111111111111111111111111111
+    - name: java-api
+      image: ghcr.io/gabrielldn/java-api-with-otlp-sdk@sha256:1111111111111111111111111111111111111111111111111111111111111111
 EOF2
 
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" apply -f /tmp/demo-app-deny.yaml || true
+  kubectl --context "${ctx}" apply -f /tmp/java-api-deny.yaml || true
 done
 ```
 
@@ -100,7 +100,7 @@ done
 
 ```bash
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" -n apps describe pod demo-app-deny-test || true
+  kubectl --context "${ctx}" -n apps describe pod java-api-deny-test || true
   kubectl --context "${ctx}" -n apps get policyreport -o yaml > "/tmp/policyreport-${ctx}.yaml"
   kubectl --context "${ctx}" get clusterpolicyreport -o yaml > "/tmp/clusterpolicyreport-${ctx}.yaml"
 done
@@ -116,7 +116,7 @@ Resultado esperado:
 1. Induza falha determinística no AnalysisTemplate de `homolog`:
 
 ```bash
-kubectl --context k3d-sgp-homolog -n apps patch analysistemplate podinfo-success-rate \
+kubectl --context k3d-sgp-homolog -n apps patch analysistemplate java-api-success-rate \
   --type=json \
   -p='[{"op":"replace","path":"/spec/metrics/0/successCondition","value":"result[0] >= 1.10"}]'
 ```
@@ -124,8 +124,8 @@ kubectl --context k3d-sgp-homolog -n apps patch analysistemplate podinfo-success
 2. Dispare nova revisão do rollout:
 
 ```bash
-kubectl --context k3d-sgp-homolog -n apps argo rollouts restart podinfo
-kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout podinfo --watch
+kubectl --context k3d-sgp-homolog -n apps argo rollouts restart java-api
+kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout java-api --watch
 ```
 
 3. Colete evidências:
@@ -133,7 +133,7 @@ kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout podinfo --wa
 ```bash
 kubectl --context k3d-sgp-homolog -n apps get analysisrun --sort-by=.metadata.creationTimestamp
 kubectl --context k3d-sgp-homolog -n apps describe analysisrun <analysisrun-name>
-kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout podinfo
+kubectl --context k3d-sgp-homolog -n apps argo rollouts get rollout java-api
 ```
 
 Resultado esperado:
@@ -147,14 +147,14 @@ Resultado esperado:
 
 ```bash
 for ctx in k3d-sgp-homolog k3d-sgp-prod; do
-  kubectl --context "${ctx}" -n apps delete pod demo-app-deny-test --ignore-not-found
+  kubectl --context "${ctx}" -n apps delete pod java-api-deny-test --ignore-not-found
 done
 ```
 
 2. Restaure manifests alterados localmente no cenário A:
 
 ```bash
-git restore gitops/apps/workloads/demo-app/overlays/homolog/deployment-patch.yaml gitops/apps/workloads/demo-app/overlays/prod/deployment-patch.yaml
+git restore gitops/apps/workloads/java-api/overlays/homolog/rollout-patch.yaml gitops/apps/workloads/java-api/overlays/prod/rollout-patch.yaml
 ```
 
 3. Restaure o estado GitOps dos clusters:

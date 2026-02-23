@@ -2,7 +2,7 @@
 
 This directory contains build and provenance assets used by GitHub Actions:
 
-- `demo-app/`: sample non-root containerized app.
+- workload source: `<owner>/java-api-with-otlp-sdk` (checked out during release workflow).
 - `attestations/`: provenance templates.
 - workflows in `.github/workflows/` implement SBOM, scanning, signing and attestation.
 

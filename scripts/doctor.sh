@@ -24,13 +24,20 @@ if command -v yq >/dev/null 2>&1; then
   min_cpu="$(profile_value '.host.min_cpu')"
   min_mem="$(profile_value '.host.min_memory_gb')"
 else
-  if [[ "$profile" == "full" ]]; then
-    min_cpu="8"
-    min_mem="16"
-  else
-    min_cpu="6"
-    min_mem="8"
-  fi
+  case "$profile" in
+    full)
+      min_cpu="8"
+      min_mem="16"
+      ;;
+    tiny)
+      min_cpu="4"
+      min_mem="6"
+      ;;
+    *)
+      min_cpu="6"
+      min_mem="8"
+      ;;
+  esac
 fi
 
 printf 'profile: %s\n' "$profile"

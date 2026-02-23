@@ -35,6 +35,8 @@ flowchart LR
 - Políticas: Kyverno (baseline + supply chain).
 - Segredos: Vault (hub) + External Secrets nos 3 clusters.
 - PKI: Step-CA (hub) + cert-manager + step-issuer nos 3 clusters.
+- Workload de referência: `java-api-with-otlp-sdk` (Rollout canário com AnalysisTemplate).
+- Backend de dados de referência: `postgres-ha-chaos-lab` via endpoint RW `host.k3d.internal:15432`.
 - Segurança runtime: Trivy Operator obrigatório, Falco opcional quando o kernel não suporta todos os recursos necessários.
 - Observabilidade: Prometheus/Loki/Tempo/Grafana + OTel Collector.
   - `dev`: stack completa (Prometheus, Loki, Tempo, OTel).
@@ -83,7 +85,7 @@ Pipeline de artefato:
 - Build e publicação em GHCR (source of truth).
 - SBOM + scan + assinatura + attestation.
 - Verificação (`cosign verify` e `cosign verify-attestation`) com chave pública.
-- Deploy por digest no workload de demonstração (`secure-gitops-demo-app`), sem substituir o `podinfo`.
+- Deploy por digest no workload `java-api-with-otlp-sdk` com progressão canário e rollback automático por métrica.
 - Sync opcional para registry local (`localhost:5001`).
 
 ## Segredos e PKI
@@ -94,7 +96,7 @@ Pipeline de artefato:
 
 ## Observabilidade e SLO
 
-- Objetivo padrão: disponibilidade `99.5%` para `podinfo`.
+- Objetivo padrão: disponibilidade `99.5%` para o workload canário de referência.
 - SLI de disponibilidade e latência em `slo/objectives.yaml`.
 - Alertas de burn-rate e latência em `slo/alert-rules.yaml`.
 - Runbooks de resposta em `runbooks/`.

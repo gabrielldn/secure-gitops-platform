@@ -1,0 +1,36 @@
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: sgp-homolog
+servers: 1
+agents: 0
+image: rancher/k3s:v1.31.5-k3s1
+kubeAPI:
+  hostIP: "0.0.0.0"
+  hostPort: "6551"
+ports:
+  - port: 8082:80
+    nodeFilters:
+      - loadbalancer
+  - port: 8445:443
+    nodeFilters:
+      - loadbalancer
+
+options:
+  k3d:
+    wait: true
+    timeout: "300s"
+  k3s:
+    extraArgs:
+      - arg: --disable=traefik
+        nodeFilters:
+          - server:*
+      - arg: --disable=servicelb
+        nodeFilters:
+          - server:*
+      - arg: --tls-san=host.k3d.internal
+        nodeFilters:
+          - server:*
+registries:
+  use:
+    - k3d-sgp-registry.localhost:5001

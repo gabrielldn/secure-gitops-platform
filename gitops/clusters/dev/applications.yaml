@@ -636,7 +636,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-demo-app
+  name: dev-java-api
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "55"
@@ -648,7 +648,7 @@ spec:
   source:
     repoURL: __REPO_URL__
     targetRevision: __GITOPS_REVISION__
-    path: gitops/apps/workloads/demo-app/overlays/dev
+    path: gitops/apps/workloads/java-api/overlays/dev
   syncPolicy:
     automated:
       prune: true
